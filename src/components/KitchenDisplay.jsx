@@ -9,17 +9,20 @@ const KitchenDisplay = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Listen for all orders, sorted by newest
-    const q = query(
-      collection(db, "orders"), 
-      orderBy("createdAt", "desc")
-    );
+    // Listen for orders
+    const q = query(collection(db, "orders"), orderBy("createdAt", "asc"));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const allOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Only show active orders (Not completed)
-      const activeOrders = allOrders.filter(o => o.status !== 'COMPLETED');
-      setOrders(activeOrders);
+      
+      // FILTER: Hide 'COMPLETED' and 'PAID' orders. 
+      // Kitchen only cares about PENDING, PREPARING, and READY.
+      const kitchenOrders = allOrders.filter(o => 
+        o.status !== 'COMPLETED' && 
+        o.status !== 'PAID'
+      );
+      
+      setOrders(kitchenOrders);
       setLoading(false);
     });
 
@@ -27,90 +30,203 @@ const KitchenDisplay = () => {
   }, []);
 
   const updateStatus = async (orderId, newStatus) => {
-    const orderRef = doc(db, "orders", orderId);
-    await updateDoc(orderRef, { status: newStatus });
-  };
-
-  const getStatusColor = (status) => {
-    switch(status) {
-      case 'PENDING': return '#FF9800'; // Orange
-      case 'PREPARING': return '#2196F3'; // Blue
-      case 'READY': return '#4CAF50'; // Green
-      default: return '#999';
+    try {
+        const orderRef = doc(db, "orders", orderId);
+        await updateDoc(orderRef, { status: newStatus });
+    } catch (error) {
+        console.error("Error updating status:", error);
     }
   };
 
-  if (loading) return <div style={{padding:'50px'}}>Loading Kitchen Tickets...</div>;
+  // Helper to render a card
+  const OrderCard = ({ order, buttonText, nextStatus, btnColor }) => (
+    <div key={order.id} style={styles.card}>
+        <div style={styles.cardHeader}>
+            <span style={{fontWeight:'bold', fontSize:'1.1rem'}}>{order.tableId}</span>
+            <span style={{fontSize:'0.8rem', color:'#666'}}>#{order.id.slice(-4)}</span>
+        </div>
+        
+        <div style={styles.itemList}>
+            {order.items.map((item, index) => (
+                <div key={index} style={{marginBottom:'5px', fontSize:'0.95rem'}}>
+                    <span style={{fontWeight:'bold'}}>{item.qty}x </span>
+                    <span>{item.name}</span>
+                    {/* Modifiers (No onions, etc) */}
+                    {item.selectedExtras && item.selectedExtras.length > 0 && (
+                        <div style={{fontSize:'0.8rem', color:'#d32f2f', paddingLeft:'20px'}}>
+                            {item.selectedExtras.map(e => `+ ${e.name}`).join(', ')}
+                        </div>
+                    )}
+                </div>
+            ))}
+        </div>
+
+        <button 
+            onClick={() => updateStatus(order.id, nextStatus)}
+            style={{...styles.actionBtn, backgroundColor: btnColor}}
+        >
+            {buttonText}
+        </button>
+    </div>
+  );
+
+  if (loading) return <div style={{padding:'40px'}}>Loading Kitchen Board...</div>;
 
   return (
-    <div style={{ padding: '20px', backgroundColor: '#f5f5f5', minHeight: '100vh' }}>
-      <div style={{ display: 'flex', alignItems: 'center', marginBottom: '20px' }}>
-        <button onClick={() => navigate('/')} style={{ marginRight: '20px', padding: '10px' }}>← Back</button>
-        <h1>Kitchen Display System (KDS)</h1>
+    <div style={styles.container}>
+      {/* HEADER */}
+      <div style={styles.header}>
+        <button onClick={() => navigate('/')} style={styles.backBtn}>← Dashboard</button>
+        <h1 style={{margin:0}}>Kitchen Display System</h1>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-        {orders.length === 0 && <p>No active orders.</p>}
+      {/* KANBAN BOARD */}
+      <div style={styles.board}>
         
-        {orders.map(order => (
-          <div key={order.id} style={{ backgroundColor: 'white', borderRadius: '10px', padding: '20px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', borderTop: `5px solid ${getStatusColor(order.status)}` }}>
-            
-            {/* Header: Table & Status */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px' }}>
-              <span style={{ fontWeight: 'bold', fontSize: '1.2em' }}>{order.tableId}</span>
-              <span style={{ backgroundColor: getStatusColor(order.status), color: 'white', padding: '4px 10px', borderRadius: '4px', fontSize: '0.8em' }}>
-                {order.status}
-              </span>
+        {/* COLUMN 1: NEW ORDERS */}
+        <div style={styles.column}>
+            <div style={{...styles.colHeader, borderBottom: '4px solid #FF9800'}}>
+                New Order ({orders.filter(o => o.status === 'PENDING').length})
             </div>
-            
-            {/* Order Items List */}
-            <div style={{ borderTop: '1px solid #eee', borderBottom: '1px solid #eee', padding: '15px 0', marginBottom: '15px' }}>
-              {order.items.map((item, index) => (
-                <div key={index} style={{ marginBottom: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 'bold' }}>
-                    <span>{item.name}</span>
-                    <span style={{ fontSize: '1.1em' }}>x{item.qty}</span>
-                  </div>
-                  
-                  {/* --- NEW: Display Modifiers --- */}
-                  {item.selectedExtras && item.selectedExtras.length > 0 && (
-                    <div style={{ color: '#D32F2F', fontSize: '0.9em', paddingLeft: '10px', marginTop: '2px' }}>
-                      {item.selectedExtras.map((ex, i) => (
-                        <div key={i}>+ {ex.name}</div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+            <div style={styles.colContent}>
+                {orders.filter(o => o.status === 'PENDING').map(order => (
+                    <OrderCard 
+                        key={order.id} 
+                        order={order} 
+                        buttonText="Acknowledge" 
+                        nextStatus="PREPARING" 
+                        btnColor="#FF9800" 
+                    />
+                ))}
             </div>
+        </div>
 
-            {/* Action Buttons */}
-            <div style={{ display: 'flex', gap: '10px' }}>
-              {order.status === 'PENDING' && (
-                <button onClick={() => updateStatus(order.id, 'PREPARING')} style={{ flex: 1, padding: '10px', background: '#2196F3', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
-                  Start Cooking
-                </button>
-              )}
-              {order.status === 'PREPARING' && (
-                <button onClick={() => updateStatus(order.id, 'READY')} style={{ flex: 1, padding: '10px', background: '#FF9800', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
-                  Mark Ready
-                </button>
-              )}
-              {order.status === 'READY' && (
-                <button onClick={() => updateStatus(order.id, 'COMPLETED')} style={{ flex: 1, padding: '10px', background: '#4CAF50', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' }}>
-                  Serve
-                </button>
-              )}
+        {/* COLUMN 2: IN PREPARATION */}
+        <div style={styles.column}>
+            <div style={{...styles.colHeader, borderBottom: '4px solid #2196F3'}}>
+                In Preparation ({orders.filter(o => o.status === 'PREPARING').length})
             </div>
-            
-            <div style={{ marginTop: '10px', fontSize: '0.7em', color: '#aaa', textAlign: 'center' }}>
-               Ticket ID: {order.id.slice(0,6)}
+            <div style={styles.colContent}>
+                {orders.filter(o => o.status === 'PREPARING').map(order => (
+                    <OrderCard 
+                        key={order.id} 
+                        order={order} 
+                        buttonText="Mark Ready" 
+                        nextStatus="READY" 
+                        btnColor="#2196F3" 
+                    />
+                ))}
             </div>
-          </div>
-        ))}
+        </div>
+
+        {/* COLUMN 3: READY */}
+        <div style={styles.column}>
+            <div style={{...styles.colHeader, borderBottom: '4px solid #4CAF50'}}>
+                Ready ({orders.filter(o => o.status === 'READY').length})
+            </div>
+            <div style={styles.colContent}>
+                {orders.filter(o => o.status === 'READY').map(order => (
+                    <OrderCard 
+                        key={order.id} 
+                        order={order} 
+                        buttonText="Serve" 
+                        nextStatus="COMPLETED" 
+                        btnColor="#4CAF50" 
+                    />
+                ))}
+            </div>
+        </div>
+
       </div>
     </div>
   );
+};
+
+// --- STYLES ---
+const styles = {
+    container: {
+        padding: '20px',
+        backgroundColor: '#f4f6f8',
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        fontFamily: 'Arial, sans-serif'
+    },
+    header: {
+        display: 'flex',
+        alignItems: 'center',
+        marginBottom: '20px'
+    },
+    backBtn: {
+        marginRight: '20px',
+        padding: '8px 16px',
+        border: 'none',
+        backgroundColor: '#333',
+        color: 'white',
+        borderRadius: '4px',
+        cursor: 'pointer'
+    },
+    board: {
+        display: 'flex',
+        gap: '20px',
+        flex: 1,
+        overflow: 'hidden' // Prevents page scroll, individual columns scroll
+    },
+    column: {
+        flex: 1,
+        backgroundColor: '#e3e8eb',
+        borderRadius: '8px',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        minWidth: '300px'
+    },
+    colHeader: {
+        padding: '15px',
+        backgroundColor: 'white',
+        fontWeight: 'bold',
+        fontSize: '1.1rem',
+        textTransform: 'uppercase',
+        letterSpacing: '1px',
+        textAlign: 'center'
+    },
+    colContent: {
+        padding: '15px',
+        overflowY: 'auto',
+        flex: 1
+    },
+    card: {
+        backgroundColor: 'white',
+        borderRadius: '8px',
+        padding: '15px',
+        marginBottom: '15px',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+        display: 'flex',
+        flexDirection: 'column'
+    },
+    cardHeader: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '10px',
+        borderBottom: '1px solid #eee',
+        paddingBottom: '5px'
+    },
+    itemList: {
+        flex: 1,
+        marginBottom: '15px'
+    },
+    actionBtn: {
+        width: '100%',
+        padding: '10px',
+        border: 'none',
+        borderRadius: '4px',
+        color: 'white',
+        fontWeight: 'bold',
+        cursor: 'pointer',
+        fontSize: '1rem',
+        textTransform: 'uppercase'
+    }
 };
 
 export default KitchenDisplay;
