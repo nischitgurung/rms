@@ -55,7 +55,7 @@ const Dashboard = () => {
     { title: "Inventory", icon: icons.inventory, path: "/inventory" },
     // Extra modules kept consistent with the black theme
     { title: "Menu Manager", icon: icons.menu, path: "/admin-menu" },
-    { title: "Day Book", icon: icons.finance, path: "/daybook" },
+    { title: "Day Book", icon: icons.finance, path: "/finance" },
   ];
 
   return (
