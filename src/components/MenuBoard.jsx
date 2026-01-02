@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, getDocs, addDoc, updateDoc, doc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 
-// --- SUB-COMPONENTS (Defined outside to prevent re-render bugs) ---
+// --- SUB-COMPONENTS ---
 
 const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, isMobile }) => (
     <div style={{ 
@@ -112,23 +112,116 @@ const MenuView = ({ categories, activeCategory, setActiveCategory, items, handle
     </div>
 );
 
-const SidebarView = ({ navigate, isMobile }) => (
-    <div style={{ 
-        width: isMobile ? '100%' : '220px', 
-        height: isMobile ? 'calc(100vh - 60px)' : '100vh',
-        backgroundColor: '#f0f0f0', 
-        borderLeft: isMobile ? 'none' : '1px solid #ddd', 
-        padding: '20px', display: 'flex', flexDirection: 'column' 
-    }}>
-         <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', color: '#000000' }}>OTHER OPTIONS</h3>
-         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <button onClick={() => navigate('/admin-menu')} style={sidebarBtn}>Menu Dishes</button>
-            <button onClick={() => navigate('/tables')} style={sidebarBtn}>Table Management</button>
-            <button onClick={() => navigate('/inventory')} style={sidebarBtn}>Inventory</button>
-         </div>
-         <button onClick={() => navigate('/')} style={{ ...sidebarBtn, marginTop: 'auto', backgroundColor: '#333', color: 'white' }}>← Dashboard</button>
-    </div>
-);
+// --- NEW DROPDOWN SIDEBAR COMPONENT ---
+const SidebarView = ({ navigate, isMobile }) => {
+    // State to track which section is open
+    const [openSection, setOpenSection] = useState(null);
+
+    const toggleSection = (sectionName) => {
+        setOpenSection(openSection === sectionName ? null : sectionName);
+    };
+
+    // Data Structure for the Menu
+    const menuOptions = [
+        {
+            title: "1. Menu",
+            icon: "🍔",
+            subItems: [
+                { label: "a. Dishes", path: "/admin-menu" },
+                { label: "b. Category", path: "/admin-category" },
+                { label: "c. Combo Offer", path: "/admin-combos" },
+                { label: "d. Add On & Extras", path: "/admin-addons" }
+            ]
+        },
+        {
+            title: "2. Finance",
+            icon: "💰",
+            subItems: [
+                { label: "a. Daybook", path: "/finance-daybook" },
+                { label: "b. Transactions", path: "/finance-transactions" },
+                { label: "c. Sales & Purchases", path: "/finance-sales" },
+                { label: "d. Income & Expenses", path: "/finance-income" }
+            ]
+        },
+        {
+            title: "3. Inventory",
+            icon: "📦",
+            subItems: [
+                { label: "a. Stock Items", path: "/inventory-stock" },
+                { label: "b. Consumption", path: "/inventory-consumption" },
+                { label: "c. Suppliers", path: "/inventory-suppliers" },
+                { label: "d. Stock Group Page", path: "/inventory-groups" }
+            ]
+        }
+    ];
+
+    return (
+        <div style={{ 
+            width: isMobile ? '100%' : '220px', 
+            height: isMobile ? 'calc(100vh - 60px)' : '100vh',
+            backgroundColor: '#f8f9fa', 
+            borderLeft: isMobile ? 'none' : '1px solid #ddd', 
+            padding: '15px', 
+            display: 'flex', 
+            flexDirection: 'column',
+            overflowY: 'auto'
+        }}>
+            <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', color: '#333', textTransform: 'uppercase', borderBottom:'1px solid #eee', paddingBottom:'10px' }}>Options</h3>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+                
+                {/* Always Visible Core Link */}
+                <button onClick={() => navigate('/tables')} style={{...sidebarBtn, backgroundColor: '#e3f2fd', border: '1px solid #90caf9'}}>
+                    🪑 Table Management
+                </button>
+
+                {/* Render Dropdowns */}
+                {menuOptions.map((section) => (
+                    <div key={section.title} style={{ marginBottom: '5px' }}>
+                        <button 
+                            onClick={() => toggleSection(section.title)} 
+                            style={{
+                                ...sidebarBtn, 
+                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                backgroundColor: openSection === section.title ? '#333' : 'white',
+                                color: openSection === section.title ? 'white' : 'black'
+                            }}
+                        >
+                            <span>{section.icon} {section.title}</span>
+                            <span>{openSection === section.title ? '▲' : '▼'}</span>
+                        </button>
+                        
+                        {/* Sub Items Container */}
+                        {openSection === section.title && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', padding: '10px 0 10px 15px', backgroundColor: '#f1f1f1', borderRadius: '0 0 8px 8px' }}>
+                                {section.subItems.map((item) => (
+                                    <button 
+                                        key={item.label} 
+                                        onClick={() => navigate(item.path)}
+                                        style={{
+                                            ...sidebarBtn,
+                                            backgroundColor: 'transparent',
+                                            boxShadow: 'none',
+                                            fontSize: '0.85rem',
+                                            padding: '8px',
+                                            color: '#555'
+                                        }}
+                                        onMouseEnter={(e) => e.target.style.color = '#000'}
+                                        onMouseLeave={(e) => e.target.style.color = '#555'}
+                                    >
+                                        {item.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+
+            <button onClick={() => navigate('/')} style={{ ...sidebarBtn, marginTop: '20px', backgroundColor: '#d32f2f', color: 'white' }}>← Dashboard</button>
+        </div>
+    );
+};
 
 // --- MAIN COMPONENT ---
 
@@ -358,7 +451,7 @@ const MenuBoard = () => {
                 }}>
                     {tables.map(table => (
                         <button 
-                            type="button" // Explicitly define type
+                            type="button" 
                             key={table.id}
                             disabled={table.status === 'Not Available'}
                             onClick={() => handleSelectTable(table)}
@@ -370,7 +463,7 @@ const MenuBoard = () => {
                                 color: table.status === 'Not Available' ? '#aaa' : 'black',
                                 cursor: table.status === 'Not Available' ? 'not-allowed' : 'pointer',
                                 fontSize: '1.1rem', fontWeight: 'bold',
-                                minHeight: '80px', // Easy to tap on mobile
+                                minHeight: '80px', 
                                 display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
                             }}
                         >
