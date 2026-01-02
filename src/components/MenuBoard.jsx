@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, getDocs, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, addDoc, updateDoc, doc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 
 const MenuBoard = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { tableId, tableName } = location.state || { tableId: 'Walk-in', tableName: 'Walk-in' };
+  // Get initial table if passed from the previous screen
+  const { tableId: initialTableId, tableName: initialTableName } = location.state || { tableId: 'Walk-in', tableName: 'Walk-in' };
 
   // --- STATE ---
   const [categories, setCategories] = useState([]);
@@ -16,7 +17,11 @@ const MenuBoard = () => {
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Modal State
+  // Tables State (For selecting table at the end)
+  const [tables, setTables] = useState([]);
+  const [showTableSelector, setShowTableSelector] = useState(false);
+
+  // Modal State (For Items)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null); 
   const [selectedExtras, setSelectedExtras] = useState([]); 
@@ -38,9 +43,20 @@ const MenuBoard = () => {
       }
     };
     fetchData();
+
+    // Listen to Tables (Real-time, to show available ones)
+    const unsubTables = onSnapshot(collection(db, "tables"), (snapshot) => {
+        setTables(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => {
+            const numA = parseInt(a.name.replace(/^\D+/g, '')) || 0;
+            const numB = parseInt(b.name.replace(/^\D+/g, '')) || 0;
+            return numA - numB;
+        }));
+    });
+
+    return () => unsubTables();
   }, []);
 
-  // --- HANDLERS ---
+  // --- ITEM HANDLERS ---
   const handleItemClick = (item) => {
     setSelectedItem(item);
     setSelectedExtras([]); 
@@ -68,26 +84,53 @@ const MenuBoard = () => {
     setIsModalOpen(false); 
   };
 
-  const handleSendOrder = async () => {
-    if (cart.length === 0) return alert("Cart is empty!");
+  // --- SEND ORDER LOGIC ---
+  
+  // 1. Triggered by "SEND ORDER" button
+  const handleSendClick = () => {
+      if (cart.length === 0) return alert("Cart is empty!");
+
+      // If we already know the table (passed from Table Management), confirm and send
+      if (initialTableId !== 'Walk-in') {
+          if(window.confirm(`Send order for ${initialTableName}?`)) {
+              finalizeOrder(initialTableId, initialTableName);
+          }
+      } else {
+          // If generic POS mode, OPEN TABLE SELECTOR
+          setShowTableSelector(true);
+      }
+  };
+
+  // 2. Triggered when a table is clicked in the selector
+  const handleSelectTable = (table) => {
+      if(window.confirm(`Assign order to ${table.name} and send to kitchen?`)) {
+          finalizeOrder(table.id, table.name);
+      }
+  };
+
+  // 3. Actual Database Write
+  const finalizeOrder = async (tId, tName) => {
     try {
       const totalAmount = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
+      
+      // Add Order
       await addDoc(collection(db, "orders"), {
         items: cart,
         totalAmount,
         status: "PENDING",
         createdAt: serverTimestamp(),
-        tableId: tableName, 
-        tableDocId: tableId 
+        tableId: tName, // Store Name for display
+        tableDocId: tId // Store ID for reference
       });
 
-      if(tableId !== 'Walk-in') {
-        await updateDoc(doc(db, "tables", tableId), { status: "Occupied" });
-      }
-      alert("Order Sent to Kitchen!");
-      navigate('/tables'); 
+      // Update Table Status to Occupied
+      await updateDoc(doc(db, "tables", tId), { status: "Occupied", guests: 4 });
+
+      alert(`Order Sent to Kitchen for ${tName}!`);
+      navigate('/tables'); // Go back to dashboard
     } catch (error) {
       console.error(error);
+      alert("Error sending order");
     }
   };
 
@@ -100,7 +143,9 @@ const MenuBoard = () => {
       <div style={{ width: '300px', backgroundColor: 'white', borderRight: '1px solid #ddd', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: '20px', borderBottom: '1px solid #eee' }}>
             <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#000000' }}>CART</h2>
-            <div style={{ fontSize: '0.9rem', color: '#666666' }}>Order for: {tableName}</div>
+            <div style={{ fontSize: '0.9rem', color: '#666666' }}>
+                Order for: <strong>{initialTableName === 'Walk-in' ? 'Select Table Next ->' : initialTableName}</strong>
+            </div>
         </div>
         
         <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
@@ -122,8 +167,9 @@ const MenuBoard = () => {
                 <span>Total</span>
                 <span>${cart.reduce((acc, item) => acc + item.price, 0).toFixed(2)}</span>
             </div>
-            <button onClick={handleSendOrder} style={{ width: '100%', padding: '15px', backgroundColor: 'black', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
-                SEND ORDER
+            {/* UPDATED BUTTON CLICK HANDLER */}
+            <button onClick={handleSendClick} style={{ width: '100%', padding: '15px', backgroundColor: 'black', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' }}>
+                {initialTableId === 'Walk-in' ? 'SELECT TABLE & SEND' : 'SEND TO KITCHEN'}
             </button>
         </div>
       </div>
@@ -135,9 +181,7 @@ const MenuBoard = () => {
             <button 
                 onClick={() => setActiveCategory('All')}
                 style={{ 
-                    padding: '10px 20px', 
-                    borderRadius: '20px', 
-                    border: '1px solid #ddd',
+                    padding: '10px 20px', borderRadius: '20px', border: '1px solid #ddd',
                     backgroundColor: activeCategory === 'All' ? 'black' : 'white',
                     color: activeCategory === 'All' ? 'white' : 'black',
                     cursor: 'pointer', whiteSpace: 'nowrap'
@@ -150,9 +194,7 @@ const MenuBoard = () => {
                     key={cat.id} 
                     onClick={() => setActiveCategory(cat.id)}
                     style={{ 
-                        padding: '10px 20px', 
-                        borderRadius: '20px', 
-                        border: '1px solid #ddd',
+                        padding: '10px 20px', borderRadius: '20px', border: '1px solid #ddd',
                         backgroundColor: activeCategory === cat.id ? 'black' : 'white',
                         color: activeCategory === cat.id ? 'white' : 'black',
                         cursor: 'pointer', whiteSpace: 'nowrap'
@@ -170,13 +212,9 @@ const MenuBoard = () => {
                     key={item.id} 
                     onClick={() => handleItemClick(item)}
                     style={{ 
-                        backgroundColor: 'white', 
-                        borderRadius: '12px', 
-                        padding: '15px', 
-                        textAlign: 'center', 
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.05)', 
-                        cursor: 'pointer',
-                        border: '1px solid #eee'
+                        backgroundColor: 'white', borderRadius: '12px', padding: '15px', 
+                        textAlign: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', 
+                        cursor: 'pointer', border: '1px solid #eee'
                     }}
                 >
                     <h4 style={{ margin: '0 0 5px 0', fontSize: '1rem', color: '#000000' }}>{item.name}</h4>
@@ -197,7 +235,7 @@ const MenuBoard = () => {
          <button onClick={() => navigate('/')} style={{ ...sidebarBtn, marginTop: 'auto', backgroundColor: '#333', color: 'white' }}>← Dashboard</button>
       </div>
 
-      {/* --- MODAL --- */}
+      {/* --- MODAL 1: ADD ITEM EXTRAS --- */}
       {isModalOpen && selectedItem && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
           <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '12px', width: '400px', color: '#000000' }}>
@@ -223,6 +261,45 @@ const MenuBoard = () => {
           </div>
         </div>
       )}
+
+      {/* --- MODAL 2: TABLE SELECTION (Triggered on Send) --- */}
+      {showTableSelector && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000 }}>
+            <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '12px', width: '600px', maxWidth: '90%', maxHeight: '90vh', display:'flex', flexDirection:'column' }}>
+                <h2 style={{marginTop:0, marginBottom: '20px', textAlign:'center'}}>Select Table for Order</h2>
+                
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '15px', overflowY:'auto', flex:1, padding: '5px' }}>
+                    {tables.map(table => (
+                        <button 
+                            key={table.id}
+                            disabled={table.status === 'Not Available'}
+                            onClick={() => handleSelectTable(table)}
+                            style={{
+                                padding: '20px', 
+                                border: '2px solid #eee', 
+                                borderRadius: '8px', 
+                                backgroundColor: table.status === 'Available' ? '#E8F5E9' : (table.status === 'Occupied' ? '#FFEBEE' : '#f0f0f0'),
+                                color: table.status === 'Not Available' ? '#aaa' : 'black',
+                                cursor: table.status === 'Not Available' ? 'not-allowed' : 'pointer',
+                                fontSize: '1.1rem', fontWeight: 'bold'
+                            }}
+                        >
+                            {table.name}
+                            <div style={{fontSize:'0.7rem', fontWeight:'normal', marginTop:'5px'}}>{table.status}</div>
+                        </button>
+                    ))}
+                </div>
+
+                <button 
+                    onClick={() => setShowTableSelector(false)}
+                    style={{ marginTop: '20px', padding: '15px', background: '#333', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+                >
+                    Cancel / Go Back
+                </button>
+            </div>
+        </div>
+      )}
+
     </div>
   );
 };
