@@ -5,7 +5,6 @@ import { collection, getDocs, addDoc, updateDoc, doc, serverTimestamp, onSnapsho
 
 // --- SUB-COMPONENTS ---
 
-// UPDATED: Added updateQty and removeItem props
 const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, updateQty, removeItem, isMobile }) => (
     <div style={{ 
         width: isMobile ? '100%' : '320px', 
@@ -26,7 +25,6 @@ const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, upd
             {cart.map((item) => (
                 <div key={item.cartId} style={{ marginBottom: '15px', paddingBottom: '10px', borderBottom: '1px dashed #eee' }}>
                     
-                    {/* Item Name and Price */}
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom:'5px' }}>
                         <div>
                             <div style={{ fontWeight: 'bold', color: '#000000' }}>
@@ -41,27 +39,11 @@ const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, upd
                         </div>
                     </div>
 
-                    {/* NEW: Quantity Controls & Remove */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
-                        <button 
-                            onClick={() => updateQty(item.cartId, -1)}
-                            style={{ width:'25px', height:'25px', borderRadius:'50%', border:'1px solid #ddd', background:'white', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
-                        >-</button>
-                        
+                        <button onClick={() => updateQty(item.cartId, -1)} style={{ width:'25px', height:'25px', borderRadius:'50%', border:'1px solid #ddd', background:'white', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>-</button>
                         <span style={{ fontSize:'0.9rem', fontWeight:'bold' }}>{item.qty}</span>
-                        
-                        <button 
-                            onClick={() => updateQty(item.cartId, 1)}
-                            style={{ width:'25px', height:'25px', borderRadius:'50%', border:'1px solid #ddd', background:'white', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
-                        >+</button>
-
-                        <button 
-                            onClick={() => removeItem(item.cartId)}
-                            style={{ marginLeft: '10px', background: 'none', border: 'none', cursor: 'pointer', fontSize:'1rem' }}
-                            title="Remove Item"
-                        >
-                            🗑️
-                        </button>
+                        <button onClick={() => updateQty(item.cartId, 1)} style={{ width:'25px', height:'25px', borderRadius:'50%', border:'1px solid #ddd', background:'white', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
+                        <button onClick={() => removeItem(item.cartId)} style={{ marginLeft: '10px', background: 'none', border: 'none', cursor: 'pointer', fontSize:'1rem' }} title="Remove Item">🗑️</button>
                     </div>
 
                 </div>
@@ -71,7 +53,6 @@ const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, upd
         <div style={{ padding: '20px', borderTop: '2px solid #333', backgroundColor: '#fff' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '15px', color: '#000000' }}>
                 <span>Total</span>
-                {/* Updated Total Calculation */}
                 <span>${cart.reduce((acc, item) => acc + (item.price * item.qty), 0).toFixed(2)}</span>
             </div>
             <button 
@@ -84,69 +65,104 @@ const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, upd
     </div>
 );
 
-const MenuView = ({ categories, activeCategory, setActiveCategory, items, handleItemClick, isMobile }) => (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: isMobile ? 'calc(100vh - 60px)' : '100vh' }}>
-        {/* Categories */}
-        <div style={{ 
-            padding: '15px', backgroundColor: 'white', borderBottom: '1px solid #ddd', 
-            display: 'flex', gap: '10px', overflowX: 'auto', whiteSpace: 'nowrap',
-            WebkitOverflowScrolling: 'touch' 
-        }}>
-            <button 
-                onClick={() => setActiveCategory('All')}
-                style={{ 
-                    padding: '8px 16px', borderRadius: '20px', border: '1px solid #ddd',
-                    backgroundColor: activeCategory === 'All' ? 'black' : 'white',
-                    color: activeCategory === 'All' ? 'white' : 'black',
-                    cursor: 'pointer', flexShrink: 0
-                }}
-            >
-                All Items
-            </button>
-            {categories.map(cat => (
-                 <button 
-                    key={cat.id} 
-                    onClick={() => setActiveCategory(cat.id)}
+// --- UPDATED MENU VIEW (Fixes Filtering Issue) ---
+const MenuView = ({ categories, activeCategory, setActiveCategory, items, handleItemClick, isMobile }) => {
+
+    // 1. SMART FILTER: Matches either ID or Name to support old and new data
+    const getFilteredItems = () => {
+        if (activeCategory === 'All') return items;
+
+        // Find the currently selected category object to get its Name
+        const currentCat = categories.find(c => c.id === activeCategory);
+        const currentCatName = currentCat ? currentCat.name : '';
+
+        return items.filter(item => {
+            // Check 1: Does dish have the Category ID? (New Data)
+            const matchID = item.categoryId === activeCategory;
+            // Check 2: Does dish have the Category Name? (Old Data)
+            const matchName = item.categoryId === currentCatName;
+            
+            return matchID || matchName;
+        });
+    };
+
+    // 2. HELPER: Calculate Count for Buttons
+    const getCount = (cat) => {
+        return items.filter(item => item.categoryId === cat.id || item.categoryId === cat.name).length;
+    };
+
+    const filteredItems = getFilteredItems();
+
+    return (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: isMobile ? 'calc(100vh - 60px)' : '100vh' }}>
+            {/* Categories */}
+            <div style={{ 
+                padding: '15px', backgroundColor: 'white', borderBottom: '1px solid #ddd', 
+                display: 'flex', gap: '10px', overflowX: 'auto', whiteSpace: 'nowrap',
+                WebkitOverflowScrolling: 'touch' 
+            }}>
+                <button 
+                    onClick={() => setActiveCategory('All')}
                     style={{ 
                         padding: '8px 16px', borderRadius: '20px', border: '1px solid #ddd',
-                        backgroundColor: activeCategory === cat.id ? 'black' : 'white',
-                        color: activeCategory === cat.id ? 'white' : 'black',
+                        backgroundColor: activeCategory === 'All' ? 'black' : 'white',
+                        color: activeCategory === 'All' ? 'white' : 'black',
                         cursor: 'pointer', flexShrink: 0
                     }}
                 >
-                    {cat.name}
+                    All Items ({items.length})
                 </button>
-            ))}
-        </div>
+                {categories.map(cat => (
+                     <button 
+                        key={cat.id} 
+                        onClick={() => setActiveCategory(cat.id)}
+                        style={{ 
+                            padding: '8px 16px', borderRadius: '20px', border: '1px solid #ddd',
+                            backgroundColor: activeCategory === cat.id ? 'black' : 'white',
+                            color: activeCategory === cat.id ? 'white' : 'black',
+                            cursor: 'pointer', flexShrink: 0
+                        }}
+                    >
+                        {cat.name} ({getCount(cat)})
+                    </button>
+                ))}
+            </div>
 
-        {/* Items */}
-        <div style={{ 
-            flex: 1, padding: '15px', overflowY: 'auto', 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', 
-            gap: '15px', alignContent: 'start'
-        }}>
-            {(activeCategory === 'All' ? items : items.filter(i => i.categoryId === activeCategory)).map(item => (
-                <div 
-                    key={item.id} 
-                    onClick={() => handleItemClick(item)}
-                    style={{ 
-                        backgroundColor: 'white', borderRadius: '12px', padding: '15px', 
-                        textAlign: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', 
-                        cursor: 'pointer', border: '1px solid #eee',
-                        display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                        minHeight: '100px'
-                    }}
-                >
-                    <h4 style={{ margin: '0 0 5px 0', fontSize: '1rem', color: '#000000' }}>{item.name}</h4>
-                    <div style={{ fontWeight: 'bold', color: '#4CAF50', marginTop: 'auto' }}>${item.price}</div>
-                </div>
-            ))}
+            {/* Items */}
+            <div style={{ 
+                flex: 1, padding: '15px', overflowY: 'auto', 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', 
+                gap: '15px', alignContent: 'start'
+            }}>
+                {filteredItems.map(item => (
+                    <div 
+                        key={item.id} 
+                        onClick={() => handleItemClick(item)}
+                        style={{ 
+                            backgroundColor: 'white', borderRadius: '12px', padding: '15px', 
+                            textAlign: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', 
+                            cursor: 'pointer', border: '1px solid #eee',
+                            display: 'flex', flexDirection: 'column', justifyContent: 'center',
+                            minHeight: '100px'
+                        }}
+                    >
+                        <h4 style={{ margin: '0 0 5px 0', fontSize: '1rem', color: '#000000' }}>{item.name}</h4>
+                        <div style={{ fontWeight: 'bold', color: '#4CAF50', marginTop: 'auto' }}>Rs. {item.price}</div>
+                    </div>
+                ))}
+                
+                {filteredItems.length === 0 && (
+                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#888', padding: '20px' }}>
+                        No items found in this category.
+                    </div>
+                )}
+            </div>
         </div>
-    </div>
-);
+    );
+};
 
-// --- NEW DROPDOWN SIDEBAR COMPONENT ---
+// --- DROPDOWN SIDEBAR ---
 const SidebarView = ({ navigate, isMobile }) => {
     const [openSection, setOpenSection] = useState(null);
 
@@ -155,101 +171,31 @@ const SidebarView = ({ navigate, isMobile }) => {
     };
 
     const menuOptions = [
-        {
-            title: "1. Menu",
-            icon: "🍔",
-            subItems: [
-                { label: "a. Dishes", path: "/admin-menu" },
-                { label: "b. Category", path: "/admin-category" },
-                { label: "c. Combo Offer", path: "/admin-combos" },
-                { label: "d. Add On & Extras", path: "/admin-addons" }
-            ]
-        },
-        {
-            title: "2. Finance",
-            icon: "💰",
-            subItems: [
-                { label: "a. Daybook", path: "/finance-daybook" },
-                { label: "b. Transactions", path: "/finance-transactions" },
-                { label: "c. Sales & Purchases", path: "/finance-sales" },
-                { label: "d. Income & Expenses", path: "/finance-income" }
-            ]
-        },
-        {
-            title: "3. Inventory",
-            icon: "📦",
-            subItems: [
-                { label: "a. Stock Items", path: "/inventory-stock" },
-                { label: "b. Consumption", path: "/inventory-consumption" },
-                { label: "c. Suppliers", path: "/inventory-suppliers" },
-                { label: "d. Stock Group Page", path: "/inventory-groups" }
-            ]
-        }
+        { title: "1. Menu", icon: "🍔", subItems: [{ label: "a. Dishes", path: "/admin-menu" }, { label: "b. Category", path: "/admin-category" }, { label: "c. Combo Offer", path: "/admin-combos" }, { label: "d. Add On & Extras", path: "/admin-addons" }] },
+        { title: "2. Finance", icon: "💰", subItems: [{ label: "a. Daybook", path: "/finance-daybook" }, { label: "b. Transactions", path: "/finance-transactions" }, { label: "c. Sales & Purchases", path: "/finance-sales" }, { label: "d. Income & Expenses", path: "/finance-income" }] },
+        { title: "3. Inventory", icon: "📦", subItems: [{ label: "a. Stock Items", path: "/inventory-stock" }, { label: "b. Consumption", path: "/inventory-consumption" }, { label: "c. Suppliers", path: "/inventory-suppliers" }] }
     ];
 
     return (
-        <div style={{ 
-            width: isMobile ? '100%' : '220px', 
-            height: isMobile ? 'calc(100vh - 60px)' : '100vh',
-            backgroundColor: '#f8f9fa', 
-            borderLeft: isMobile ? 'none' : '1px solid #ddd', 
-            padding: '15px', 
-            display: 'flex', 
-            flexDirection: 'column',
-            overflowY: 'auto'
-        }}>
+        <div style={{ width: isMobile ? '100%' : '220px', height: isMobile ? 'calc(100vh - 60px)' : '100vh', backgroundColor: '#f8f9fa', borderLeft: isMobile ? 'none' : '1px solid #ddd', padding: '15px', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
             <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', color: '#333', textTransform: 'uppercase', borderBottom:'1px solid #eee', paddingBottom:'10px' }}>Options</h3>
-            
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
-                
-                {/* Always Visible Core Link */}
-                <button onClick={() => navigate('/tables')} style={{...sidebarBtn, backgroundColor: '#e3f2fd', border: '1px solid #90caf9'}}>
-                    🪑 Table Management
-                </button>
-
-                {/* Render Dropdowns */}
+                <button onClick={() => navigate('/tables')} style={{...sidebarBtn, backgroundColor: '#e3f2fd', border: '1px solid #90caf9'}}>🪑 Table Management</button>
                 {menuOptions.map((section) => (
                     <div key={section.title} style={{ marginBottom: '5px' }}>
-                        <button 
-                            onClick={() => toggleSection(section.title)} 
-                            style={{
-                                ...sidebarBtn, 
-                                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                backgroundColor: openSection === section.title ? '#333' : 'white',
-                                color: openSection === section.title ? 'white' : 'black'
-                            }}
-                        >
-                            <span>{section.icon} {section.title}</span>
-                            <span>{openSection === section.title ? '▲' : '▼'}</span>
+                        <button onClick={() => toggleSection(section.title)} style={{ ...sidebarBtn, display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: openSection === section.title ? '#333' : 'white', color: openSection === section.title ? 'white' : 'black' }}>
+                            <span>{section.icon} {section.title}</span><span>{openSection === section.title ? '▲' : '▼'}</span>
                         </button>
-                        
-                        {/* Sub Items Container */}
                         {openSection === section.title && (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', padding: '10px 0 10px 15px', backgroundColor: '#f1f1f1', borderRadius: '0 0 8px 8px' }}>
                                 {section.subItems.map((item) => (
-                                    <button 
-                                        key={item.label} 
-                                        onClick={() => navigate(item.path)}
-                                        style={{
-                                            ...sidebarBtn,
-                                            backgroundColor: 'transparent',
-                                            boxShadow: 'none',
-                                            fontSize: '0.85rem',
-                                            padding: '8px',
-                                            color: '#555'
-                                        }}
-                                        onMouseEnter={(e) => e.target.style.color = '#000'}
-                                        onMouseLeave={(e) => e.target.style.color = '#555'}
-                                    >
-                                        {item.label}
-                                    </button>
+                                    <button key={item.label} onClick={() => navigate(item.path)} style={{ ...sidebarBtn, backgroundColor: 'transparent', boxShadow: 'none', fontSize: '0.85rem', padding: '8px', color: '#555' }}>{item.label}</button>
                                 ))}
                             </div>
                         )}
                     </div>
                 ))}
             </div>
-
             <button onClick={() => navigate('/')} style={{ ...sidebarBtn, marginTop: '20px', backgroundColor: '#d32f2f', color: 'white' }}>← Dashboard</button>
         </div>
     );
@@ -281,7 +227,7 @@ const MenuBoard = () => {
 
   // --- UI STATE FOR MOBILE ---
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
-  const [mobileTab, setMobileTab] = useState('menu'); // 'menu', 'cart', 'options'
+  const [mobileTab, setMobileTab] = useState('menu'); 
 
   // --- DATA FETCHING ---
   useEffect(() => {
@@ -294,7 +240,7 @@ const MenuBoard = () => {
         const itemSnap = await getDocs(collection(db, "menu_items"));
         const modSnap = await getDocs(collection(db, "modifiers"));
 
-        setCategories(catSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => a.sortOrder - b.sortOrder));
+        setCategories(catSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (a.sortOrder || 0) - (b.sortOrder || 0)));
         setItems(itemSnap.docs.map(d => ({id: d.id, ...d.data()})));
         setModifiers(modSnap.docs.map(d => ({id: d.id, ...d.data()})));
         setLoading(false);
@@ -333,11 +279,8 @@ const MenuBoard = () => {
     }
   };
 
-  // --- NEW GROUPING LOGIC ---
   const confirmAddToCart = () => {
     const extrasTotal = selectedExtras.reduce((sum, ex) => sum + ex.price, 0);
-    
-    // Sort extras IDs to create a unique signature for comparison
     const newExtrasIds = selectedExtras.map(e => e.id).sort().join(',');
 
     const newItem = {
@@ -347,29 +290,24 @@ const MenuBoard = () => {
       qty: 1
     };
 
-    // Check if this item with EXACT same extras exists in cart
     const existingItemIndex = cart.findIndex(item => {
         const itemExtrasIds = item.selectedExtras ? item.selectedExtras.map(e => e.id).sort().join(',') : '';
         return item.id === newItem.id && itemExtrasIds === newExtrasIds;
     });
 
     if (existingItemIndex !== -1) {
-        // Item exists, update quantity
         const updatedCart = [...cart];
         updatedCart[existingItemIndex].qty += 1;
         setCart(updatedCart);
         if(isMobile) alert("Quantity Updated!"); 
     } else {
-        // New item, add to cart with unique cartId
         newItem.cartId = Math.random().toString(36).substr(2, 9);
         setCart([...cart, newItem]);
         if(isMobile) alert("Added to Cart!"); 
     }
-
     setIsModalOpen(false); 
   };
 
-  // --- NEW: UPDATE QUANTITY HANDLER ---
   const handleUpdateQty = (cartId, delta) => {
       setCart(prevCart => {
           return prevCart.map(item => {
@@ -377,11 +315,10 @@ const MenuBoard = () => {
                   return { ...item, qty: item.qty + delta };
               }
               return item;
-          }).filter(item => item.qty > 0); // Automatically remove if qty goes to 0
+          }).filter(item => item.qty > 0); 
       });
   };
 
-  // --- NEW: REMOVE ITEM HANDLER ---
   const handleRemoveItem = (cartId) => {
       if(window.confirm("Remove this item from cart?")) {
           setCart(prevCart => prevCart.filter(item => item.cartId !== cartId));
@@ -430,24 +367,14 @@ const MenuBoard = () => {
   return (
     <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', height: '100vh', backgroundColor: '#f5f5f5', overflow: 'hidden', fontFamily: 'Arial, sans-serif' }}>
       
-      {/* DESKTOP LAYOUT */}
       {!isMobile && (
           <>
-            <CartView 
-                cart={cart} 
-                initialTableName={initialTableName} 
-                initialTableId={initialTableId} 
-                handleSendClick={handleSendClick} 
-                updateQty={handleUpdateQty} 
-                removeItem={handleRemoveItem}
-                isMobile={false} 
-            />
+            <CartView cart={cart} initialTableName={initialTableName} initialTableId={initialTableId} handleSendClick={handleSendClick} updateQty={handleUpdateQty} removeItem={handleRemoveItem} isMobile={false} />
             <MenuView categories={categories} activeCategory={activeCategory} setActiveCategory={setActiveCategory} items={items} handleItemClick={handleItemClick} isMobile={false} />
             <SidebarView navigate={navigate} isMobile={false} />
           </>
       )}
 
-      {/* MOBILE LAYOUT */}
       {isMobile && (
           <div style={{ flex: 1, overflow: 'hidden' }}>
               {mobileTab === 'menu' && <MenuView categories={categories} activeCategory={activeCategory} setActiveCategory={setActiveCategory} items={items} handleItemClick={handleItemClick} isMobile={true} />}
@@ -456,45 +383,24 @@ const MenuBoard = () => {
           </div>
       )}
 
-      {/* MOBILE BOTTOM NAVIGATION */}
       {isMobile && (
-          <div style={{ 
-              height: '60px', backgroundColor: 'white', borderTop: '1px solid #ddd', 
-              display: 'flex', justifyContent: 'space-around', alignItems: 'center',
-              position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000
-          }}>
-              <button onClick={() => setMobileTab('menu')} style={{ ...mobileNavBtn, color: mobileTab === 'menu' ? 'black' : '#888' }}>
-                  <span>🍔</span>
-                  <span style={{fontSize:'0.7rem'}}>Menu</span>
-              </button>
-              <button onClick={() => setMobileTab('cart')} style={{ ...mobileNavBtn, color: mobileTab === 'cart' ? 'black' : '#888', position: 'relative' }}>
-                  <span>🛒</span>
-                  <span style={{fontSize:'0.7rem'}}>Cart</span>
-                  {cart.length > 0 && <span style={{position:'absolute', top:5, right:20, background:'red', color:'white', borderRadius:'50%', width:'15px', height:'15px', fontSize:'0.6rem', display:'flex', alignItems:'center', justifyContent:'center'}}>{cart.length}</span>}
-              </button>
-              <button onClick={() => setMobileTab('options')} style={{ ...mobileNavBtn, color: mobileTab === 'options' ? 'black' : '#888' }}>
-                  <span>⚙️</span>
-                  <span style={{fontSize:'0.7rem'}}>Options</span>
-              </button>
+          <div style={{ height: '60px', backgroundColor: 'white', borderTop: '1px solid #ddd', display: 'flex', justifyContent: 'space-around', alignItems: 'center', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000 }}>
+              <button onClick={() => setMobileTab('menu')} style={{ ...mobileNavBtn, color: mobileTab === 'menu' ? 'black' : '#888' }}><span>🍔</span><span style={{fontSize:'0.7rem'}}>Menu</span></button>
+              <button onClick={() => setMobileTab('cart')} style={{ ...mobileNavBtn, color: mobileTab === 'cart' ? 'black' : '#888', position: 'relative' }}><span>🛒</span><span style={{fontSize:'0.7rem'}}>Cart</span>{cart.length > 0 && <span style={{position:'absolute', top:5, right:20, background:'red', color:'white', borderRadius:'50%', width:'15px', height:'15px', fontSize:'0.6rem', display:'flex', alignItems:'center', justifyContent:'center'}}>{cart.length}</span>}</button>
+              <button onClick={() => setMobileTab('options')} style={{ ...mobileNavBtn, color: mobileTab === 'options' ? 'black' : '#888' }}><span>⚙️</span><span style={{fontSize:'0.7rem'}}>Options</span></button>
           </div>
       )}
 
-      {/* --- MODAL 1: ADD ITEM EXTRAS --- */}
       {isModalOpen && selectedItem && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000 }}>
           <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '12px', width: '90%', maxWidth: '400px', color: '#000000' }}>
             <h2 style={{ marginTop: 0, color: '#000000' }}>{selectedItem.name}</h2>
             <p style={{color: '#666'}}>Base Price: ${selectedItem.price.toFixed(2)}</p>
-            
             <h4 style={{ marginBottom: '10px', color: '#000000' }}>Extras:</h4>
             <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #eee', padding: '10px', borderRadius: '8px', marginBottom: '20px' }}>
                 {modifiers.map(mod => (
                     <label key={mod.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f9f9f9', cursor: 'pointer', color: '#000000' }}>
-                        <span>
-                            <input type="checkbox" onChange={() => toggleExtra(mod)} style={{ marginRight: '10px' }} />
-                            {mod.name}
-                        </span>
-                        <span style={{ fontWeight: 'bold' }}>+${mod.price}</span>
+                        <span><input type="checkbox" onChange={() => toggleExtra(mod)} style={{ marginRight: '10px' }} />{mod.name}</span><span style={{ fontWeight: 'bold' }}>+${mod.price}</span>
                     </label>
                 ))}
             </div>
@@ -506,60 +412,18 @@ const MenuBoard = () => {
         </div>
       )}
 
-      {/* --- MODAL 2: TABLE SELECTION (Mobile Optimized) --- */}
       {showTableSelector && (
-        <div style={{ 
-            position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.9)', 
-            display: 'flex', justifyContent: 'center', alignItems: 'center', 
-            zIndex: 3000 // Higher zIndex for mobile safety
-        }}>
-            <div style={{ 
-                backgroundColor: 'white', 
-                borderRadius: isMobile ? '0' : '12px', 
-                width: isMobile ? '100%' : '600px', 
-                height: isMobile ? '100%' : 'auto',
-                maxHeight: isMobile ? '100%' : '90vh',
-                maxWidth: '100%', 
-                padding: '20px', 
-                display:'flex', flexDirection:'column' 
-            }}>
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.9)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 3000 }}>
+            <div style={{ backgroundColor: 'white', borderRadius: isMobile ? '0' : '12px', width: isMobile ? '100%' : '600px', height: isMobile ? '100%' : 'auto', maxHeight: isMobile ? '100%' : '90vh', maxWidth: '100%', padding: '20px', display:'flex', flexDirection:'column' }}>
                 <h2 style={{marginTop: isMobile ? '20px' : 0, marginBottom: '20px', textAlign:'center'}}>Select Table</h2>
-                
-                <div style={{ 
-                    display: 'grid', 
-                    gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(120px, 1fr))', 
-                    gap: '15px', overflowY:'auto', flex:1, padding: '5px' 
-                }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(120px, 1fr))', gap: '15px', overflowY:'auto', flex:1, padding: '5px' }}>
                     {tables.map(table => (
-                        <button 
-                            type="button" 
-                            key={table.id}
-                            disabled={table.status === 'Not Available'}
-                            onClick={() => handleSelectTable(table)}
-                            style={{
-                                padding: '15px', 
-                                border: '2px solid #eee', 
-                                borderRadius: '8px', 
-                                backgroundColor: table.status === 'Available' ? '#E8F5E9' : (table.status === 'Occupied' ? '#FFEBEE' : '#f0f0f0'),
-                                color: table.status === 'Not Available' ? '#aaa' : 'black',
-                                cursor: table.status === 'Not Available' ? 'not-allowed' : 'pointer',
-                                fontSize: '1.1rem', fontWeight: 'bold',
-                                minHeight: '80px', 
-                                display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
-                            }}
-                        >
-                            <span>{table.name}</span>
-                            <span style={{fontSize:'0.7rem', fontWeight:'normal', marginTop:'5px'}}>{table.status}</span>
+                        <button key={table.id} disabled={table.status === 'Not Available'} onClick={() => handleSelectTable(table)} style={{ padding: '15px', border: '2px solid #eee', borderRadius: '8px', backgroundColor: table.status === 'Available' ? '#E8F5E9' : (table.status === 'Occupied' ? '#FFEBEE' : '#f0f0f0'), color: table.status === 'Not Available' ? '#aaa' : 'black', cursor: table.status === 'Not Available' ? 'not-allowed' : 'pointer', fontSize: '1.1rem', fontWeight: 'bold', minHeight: '80px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                            <span>{table.name}</span><span style={{fontSize:'0.7rem', fontWeight:'normal', marginTop:'5px'}}>{table.status}</span>
                         </button>
                     ))}
                 </div>
-
-                <button 
-                    onClick={() => setShowTableSelector(false)}
-                    style={{ marginTop: '20px', padding: '15px', background: '#333', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}
-                >
-                    Cancel
-                </button>
+                <button onClick={() => setShowTableSelector(false)} style={{ marginTop: '20px', padding: '15px', background: '#333', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}>Cancel</button>
             </div>
         </div>
       )}
@@ -568,12 +432,7 @@ const MenuBoard = () => {
   );
 };
 
-const sidebarBtn = {
-    padding: '15px', border: 'none', backgroundColor: 'white', color: '#000000', textAlign: 'left', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
-};
-
-const mobileNavBtn = {
-    background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, padding: '10px'
-};
+const sidebarBtn = { padding: '15px', border: 'none', backgroundColor: 'white', color: '#000000', textAlign: 'left', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' };
+const mobileNavBtn = { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, padding: '10px' };
 
 export default MenuBoard;

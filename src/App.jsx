@@ -1,18 +1,19 @@
-import DayBook from './components/DayBook';
-import AddonManager from './components/AddonManager';
-import AdminMenu from './components/AdminMenu';
-import Inventory from './components/Inventory';
-import KitchenDisplay from './components/KitchenDisplay';
-import TableManagement from './components/TableManagement';
 import { useState, useEffect } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom'; // New imports
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { auth } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
-// Import your pages
+// --- COMPONENTS ---
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
-import MenuBoard from './components/MenuBoard';
+import MenuBoard from './components/MenuBoard'; // POS
+import TableManagement from './components/TableManagement';
+import KitchenDisplay from './components/KitchenDisplay';
+import AdminMenu from './components/AdminMenu';
+import Inventory from './components/Inventory';
+import AddonManager from './components/AddonManager';
+import DayBook from './components/DayBook';
+import AdminCategory from './components/AdminCategory';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -38,58 +39,84 @@ function App() {
       {/* Public Route: Login */}
       <Route path="/login" element={!user ? <Login onLogin={() => {}} /> : <Navigate to="/" />} />
 
-      {/* Protected Routes */}
+      {/* --- DASHBOARD --- */}
       <Route path="/" element={
         <ProtectedRoute>
           <Dashboard />
         </ProtectedRoute>
       } />
       
+      {/* --- POS / MENUS --- */}
       <Route path="/pos" element={
         <ProtectedRoute>
           <MenuBoard />
         </ProtectedRoute>
       } />
 
-        <Route path="/tables" element={
+      <Route path="/admin-menu" element={
+        <ProtectedRoute>
+          <AdminMenu />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/admin-category" element={
+        <ProtectedRoute>
+          <AdminCategory />
+        </ProtectedRoute>
+      } />
+
+      {/* UPDATED: Matches sidebar link "/admin-addons" */}
+      <Route path="/admin-addons" element={
+        <ProtectedRoute>
+          <AddonManager />
+        </ProtectedRoute>
+      } />
+
+      {/* Placeholder for Combos (matches sidebar to prevent 404) */}
+      <Route path="/admin-combos" element={
+        <ProtectedRoute>
+           <div style={{padding:20}}>Combo Management (Coming Soon)</div>
+        </ProtectedRoute>
+      } />
+
+      {/* --- TABLES & ORDERS --- */}
+      <Route path="/tables" element={
         <ProtectedRoute>
           <TableManagement />
         </ProtectedRoute>
       } />
 
-              <Route path="/orders" element={
-          <ProtectedRoute>
-            <KitchenDisplay />
-          </ProtectedRoute>
-        } />
-
-              <Route path="/admin-menu" element={
+      <Route path="/orders" element={
         <ProtectedRoute>
-          <AdminMenu />
+          <KitchenDisplay />
         </ProtectedRoute>
       } />
 
-        <Route path="/inventory" element={
-  <ProtectedRoute>
-    <Inventory />
-  </ProtectedRoute>
-} />
+      {/* --- INVENTORY --- */}
+      {/* UPDATED: Matches sidebar "/inventory-stock" */}
+      <Route path="/inventory-stock" element={
+        <ProtectedRoute>
+          <Inventory />
+        </ProtectedRoute>
+      } />
+      
+      {/* Route other inventory links to main Inventory for now */}
+      <Route path="/inventory-consumption" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+      <Route path="/inventory-suppliers" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
 
-<Route path="/addons" element={
-  <ProtectedRoute>
-    <AddonManager />
-  </ProtectedRoute>
-} />
-<Route path="/finance" element={
-  <ProtectedRoute>
-    <DayBook />
-  </ProtectedRoute>
-} />
+      {/* --- FINANCE --- */}
+      {/* UPDATED: Matches sidebar "/finance-daybook" */}
+      <Route path="/finance-daybook" element={
+        <ProtectedRoute>
+          <DayBook />
+        </ProtectedRoute>
+      } />
 
-      {/* Placeholders for future pages */}
-      <Route path="/orders" element={<div>Orders Page Coming Soon</div>} />
-      <Route path="/tables" element={<div>Tables Page Coming Soon</div>} />
-      <Route path="/inventory" element={<div>Inventory Page Coming Soon</div>} />
+      {/* Route other finance links to DayBook for now */}
+      <Route path="/finance-transactions" element={<ProtectedRoute><DayBook /></ProtectedRoute>} />
+      <Route path="/finance-sales" element={<ProtectedRoute><DayBook /></ProtectedRoute>} />
+      <Route path="/finance-income" element={<ProtectedRoute><DayBook /></ProtectedRoute>} />
+
     </Routes>
   );
 }
