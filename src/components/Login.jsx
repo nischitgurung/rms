@@ -1,131 +1,118 @@
 import { useState } from 'react';
 import { auth } from '../firebase';
-// Import GoogleAuthProvider and signInWithPopup
 import { signInWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { Link, useNavigate } from 'react-router-dom';
 
-const Login = ({ onLogin }) => {
+const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-  // --- 1. Email/Password Login ---
   const handleLogin = async (e) => {
     e.preventDefault();
+    setLoading(true);
+    setError('');
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      onLogin(true);
+      navigate('/'); // Successful login redirects to Dashboard
     } catch (err) {
       setError("Invalid Email or Password");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // --- 2. Google Login Logic ---
   const handleGoogleLogin = async () => {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-      onLogin(true); // Notify App that user is logged in
+      navigate('/');
     } catch (err) {
-      console.error(err);
-      setError("Google Login Failed. Try again.");
+      setError("Google Login Failed");
     }
   };
 
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center', 
-      backgroundColor: '#f8f9fa' 
-    }}>
-      <div style={{ 
-        width: '100%', 
-        maxWidth: '400px', 
-        padding: '40px', 
-        backgroundColor: 'white', 
-        borderRadius: '12px', 
-        boxShadow: '0 4px 12px rgba(0,0,0,0.1)' 
-      }}>
-        
-        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '10px' }}>WELCOME BACK</h2>
-          <p style={{ color: '#666', fontSize: '14px' }}>Welcome back! Please enter your details.</p>
+    <div style={styles.container}>
+      <div style={styles.card}>
+        <div style={styles.header}>
+          <h2 style={styles.title}>WELCOME BACK</h2>
+          <p style={styles.subtitle}>Enter your details to access your account</p>
         </div>
 
         <form onSubmit={handleLogin}>
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>Email</label>
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Email Address</label>
             <input 
               type="email" 
-              placeholder="Enter your email address" 
+              placeholder="name@company.com" 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              style={{ width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}
+              style={styles.input}
               required
             />
           </div>
 
-          <div style={{ marginBottom: '20px' }}>
-            <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>Password</label>
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Password</label>
             <input 
               type="password" 
-              placeholder="**********" 
+              placeholder="••••••••" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              style={{ width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box' }}
+              style={styles.input}
               required
             />
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', fontSize: '13px' }}>
-            <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' }}>
+          <div style={styles.utilities}>
+            <label style={styles.checkboxLabel}>
               <input type="checkbox" /> Remember me
             </label>
-            <a href="#" style={{ textDecoration: 'none', color: 'black', fontWeight: '500' }}>Forgot Password?</a>
+            <Link to="/forgot-password" style={styles.linkText}>Forgot Password?</Link>
           </div>
 
-          {error && <p style={{ color: 'red', fontSize: '13px', marginBottom: '15px', textAlign: 'center' }}>{error}</p>}
+          {error && <p style={styles.errorText}>{error}</p>}
 
-          <button 
-            type="submit" 
-            style={{ width: '100%', padding: '12px', backgroundColor: 'black', color: 'white', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '15px' }}
-          >
-            Login
+          <button type="submit" disabled={loading} style={styles.primaryBtn}>
+            {loading ? "Logging in..." : "Login"}
           </button>
 
-          {/* --- 3. Connected Google Button --- */}
-          <button 
-            type="button" 
-            onClick={handleGoogleLogin} // Trigger the function here
-            style={{ 
-              width: '100%', 
-              padding: '12px', 
-              backgroundColor: 'white', 
-              color: 'black', 
-              border: '1px solid #ddd', 
-              borderRadius: '6px', 
-              fontSize: '14px', 
-              fontWeight: 'bold', 
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: '10px'
-            }}
-          >
-            <span style={{ fontWeight: 'bold', fontSize: '16px' }}>G</span> Login with Google
+          <button type="button" onClick={handleGoogleLogin} style={styles.googleBtn}>
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/02-google-logo-color.svg" width="18" alt="G" />
+            Sign in with Google
           </button>
         </form>
 
-        <div style={{ textAlign: 'center', marginTop: '20px', fontSize: '13px' }}>
-          <span style={{ color: '#666' }}>Don't have an account? </span>
-          <a href="#" style={{ color: 'black', fontWeight: 'bold', textDecoration: 'none' }}>Sign up!</a>
+        <div style={styles.footer}>
+          <span style={{ color: '#666' }}>New user? </span>
+          <Link to="/signup" style={styles.linkTextBold}>Create an account</Link>
         </div>
-
       </div>
     </div>
   );
+};
+
+// Export styles so Signup/ForgotPass can use them
+export const styles = {
+  container: { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8f9fa', padding: '20px' },
+  card: { width: '100%', maxWidth: '400px', padding: '40px', backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 8px 24px rgba(0,0,0,0.05)' },
+  header: { textAlign: 'center', marginBottom: '30px' },
+  title: { fontSize: '24px', fontWeight: 'bold', margin: '0 0 10px 0', letterSpacing: '1px' },
+  subtitle: { color: '#666', fontSize: '14px', margin: 0 },
+  inputGroup: { marginBottom: '20px' },
+  label: { display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px' },
+  input: { width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', boxSizing: 'border-box', outline: 'none' },
+  utilities: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', fontSize: '13px' },
+  checkboxLabel: { display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer' },
+  linkText: { textDecoration: 'none', color: '#000', fontWeight: '500' },
+  linkTextBold: { color: '#000', fontWeight: 'bold', textDecoration: 'none' },
+  errorText: { color: '#dc3545', fontSize: '13px', marginBottom: '15px', textAlign: 'center' },
+  primaryBtn: { width: '100%', padding: '12px', backgroundColor: 'black', color: 'white', border: 'none', borderRadius: '6px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', marginBottom: '15px', opacity: 1 },
+  googleBtn: { width: '100%', padding: '12px', backgroundColor: 'white', color: 'black', border: '1px solid #ddd', borderRadius: '6px', fontSize: '14px', fontWeight: 'bold', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px' },
+  footer: { textAlign: 'center', marginTop: '20px', fontSize: '13px' }
 };
 
 export default Login;

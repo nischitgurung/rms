@@ -18,14 +18,17 @@ import AdminCombos from './components/AdminCombos';
 import Transactions from './components/Transactions';
 import SalesPurchases from './components/SalesPurchases';
 import IncomeExpenses from './components/IncomeExpenses';
-import Consumption from './components/Consumption'; // FIX: Imported as Consumption matches filename
+import Consumption from './components/Consumption'; 
 import Suppliers from './components/Suppliers';
+import Signup from './components/Signup';
+import ForgotPassword from './components/ForgotPassword';
 
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // This is the core Firebase listener that keeps the user logged in
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
@@ -33,59 +36,70 @@ function App() {
     return unsubscribe;
   }, []);
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) {
+    return (
+      <div style={{ 
+        height: '100vh', 
+        display: 'flex', 
+        flexDirection: 'column',
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        backgroundColor: '#f8f9fa',
+        fontFamily: 'Arial, sans-serif' 
+      }}>
+        <div style={spinnerStyle}></div>
+        <p style={{ marginTop: '20px', color: '#666', fontWeight: '500' }}>Initializing System...</p>
+      </div>
+    );
+  }
 
-  // Protect routes: If no user, force them to Login
+  // --- ROUTE GUARDS ---
+
+  // ProtectedRoute: Only allows access if the user is authenticated via Firebase
   const ProtectedRoute = ({ children }) => {
     return user ? children : <Navigate to="/login" />;
   };
 
+  // PublicRoute: Prevents logged-in users from accessing Login/Signup/ForgotPass
+  const PublicRoute = ({ children }) => {
+    return !user ? children : <Navigate to="/" />;
+  };
+
   return (
     <Routes>
-      {/* Public Route: Login */}
-      <Route path="/login" element={!user ? <Login onLogin={() => {}} /> : <Navigate to="/" />} />
+      {/* --- PUBLIC AUTH ROUTES --- */}
+      <Route path="/login" element={
+        <PublicRoute>
+          <Login onLogin={() => {}} />
+        </PublicRoute>
+      } />
+      
+      <Route path="/signup" element={
+        <PublicRoute>
+          <Signup />
+        </PublicRoute>
+      } />
+      
+      <Route path="/forgot-password" element={
+        <PublicRoute>
+          <ForgotPassword />
+        </PublicRoute>
+      } />
 
-      {/* --- DASHBOARD --- */}
+      {/* --- PRIVATE BUSINESS ROUTES (PROTECTED) --- */}
       <Route path="/" element={
         <ProtectedRoute>
           <Dashboard />
         </ProtectedRoute>
       } />
       
-      {/* --- POS / MENUS --- */}
+      {/* POS & Table Management */}
       <Route path="/pos" element={
         <ProtectedRoute>
           <MenuBoard />
         </ProtectedRoute>
       } />
 
-      <Route path="/admin-menu" element={
-        <ProtectedRoute>
-          <AdminMenu />
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/admin-category" element={
-        <ProtectedRoute>
-          <AdminCategory />
-        </ProtectedRoute>
-      } />
-
-      {/* Matches sidebar link "/admin-addons" */}
-      <Route path="/admin-addons" element={
-        <ProtectedRoute>
-          <AddonManager />
-        </ProtectedRoute>
-      } />
-
-      {/* Matches sidebar link "/admin-combos" */}
-      <Route path="/admin-combos" element={
-        <ProtectedRoute>
-          <AdminCombos />
-        </ProtectedRoute>
-      } />
-
-      {/* --- TABLES & ORDERS --- */}
       <Route path="/tables" element={
         <ProtectedRoute>
           <TableManagement />
@@ -98,27 +112,51 @@ function App() {
         </ProtectedRoute>
       } />
 
-      {/* --- INVENTORY --- */}
+      {/* Admin & Menu Control */}
+      <Route path="/admin-menu" element={
+        <ProtectedRoute>
+          <AdminMenu />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/admin-category" element={
+        <ProtectedRoute>
+          <AdminCategory />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin-addons" element={
+        <ProtectedRoute>
+          <AddonManager />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin-combos" element={
+        <ProtectedRoute>
+          <AdminCombos />
+        </ProtectedRoute>
+      } />
+
+      {/* Inventory Management */}
       <Route path="/inventory-stock" element={
         <ProtectedRoute>
           <Inventory />
         </ProtectedRoute>
       } />
       
-      {/* Route other inventory links to main Inventory for now */}
       <Route path="/inventory-consumption" element={
         <ProtectedRoute>
-            <Consumption />
+          <Consumption />
         </ProtectedRoute>
       } />
       
       <Route path="/inventory-suppliers" element={
         <ProtectedRoute>
-            <Suppliers />
+          <Suppliers />
         </ProtectedRoute>
       } />
 
-      {/* --- FINANCE --- */}
+      {/* Finance & Reports */}
       <Route path="/finance-daybook" element={
         <ProtectedRoute>
           <DayBook />
@@ -127,24 +165,44 @@ function App() {
 
       <Route path="/finance-transactions" element={
         <ProtectedRoute>
-            <Transactions />
+          <Transactions />
         </ProtectedRoute>
       } />
       
       <Route path="/finance-sales" element={
         <ProtectedRoute>
-            <SalesPurchases />
+          <SalesPurchases />
         </ProtectedRoute>
       } />
       
       <Route path="/finance-income" element={
         <ProtectedRoute>
-            <IncomeExpenses />
+          <IncomeExpenses />
         </ProtectedRoute>
       } />
 
+      {/* --- GLOBAL REDIRECT --- */}
+      <Route path="*" element={<Navigate to={user ? "/" : "/login"} />} />
     </Routes>
   );
 }
+
+// Simple CSS spinner for the loading screen
+const spinnerStyle = {
+  width: '40px',
+  height: '40px',
+  border: '4px solid #f3f3f3',
+  borderTop: '4px solid #000',
+  borderRadius: '50%',
+  animation: 'spin 1s linear infinite',
+};
+
+// Add this to your index.css or a global style tag
+/*
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+*/
 
 export default App;
