@@ -297,7 +297,11 @@ const MenuBoard = () => {
 
         setCategories(catSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (a.sortOrder || 0) - (b.sortOrder || 0)));
         setItems(itemSnap.docs.map(d => ({id: d.id, ...d.data()})));
-        setModifiers(modSnap.docs.map(d => ({id: d.id, ...d.data()})));
+        
+        // --- FIX: Filter Modifiers so only Available ones are shown ---
+        const allModifiers = modSnap.docs.map(d => ({id: d.id, ...d.data()}));
+        setModifiers(allModifiers.filter(m => m.isAvailable)); 
+
         setCombos(comboSnap.docs.map(d => ({id: d.id, ...d.data()}))); 
         setLoading(false);
       } catch (error) {
@@ -328,32 +332,25 @@ const MenuBoard = () => {
       if (combos.length === 0 || cart.length === 0) return [];
       const detected = [];
 
-      // Create a map of Cart Items (ID -> Total Qty)
-      // Example: { 'pepsi_id': 1, 'burger_id': 3 }
       const cartQtyMap = {};
       cart.forEach(item => {
-        // If it's a combo item itself, ignore it for detection purposes
         if(!item.isCombo) {
             cartQtyMap[item.id] = (cartQtyMap[item.id] || 0) + item.qty;
         }
       });
 
       combos.forEach(combo => {
-          // Skip inactive
           if (!combo.isAvailable) return;
 
-          // Note: We use 'comboItems' which has the Quantity info
-          // Example: combo.comboItems = [{id: 'pepsi_id', qty: 3}, {id: 'burger_id', qty: 1}]
           const requiredItems = combo.comboItems || [];
           if (requiredItems.length === 0) return;
 
           let match = true;
           for (const req of requiredItems) {
               const currentQtyInCart = cartQtyMap[req.id] || 0;
-              // CRITICAL FIX: Check if Cart Qty is LESS than Required Qty
               if (currentQtyInCart < req.qty) {
                   match = false;
-                  break; // Fail immediately if one ingredient is missing or insufficient
+                  break; 
               }
           }
 
@@ -370,26 +367,19 @@ const MenuBoard = () => {
       
       const requiredItems = combo.comboItems || [];
 
-      // Loop through required items (e.g., 3 Pepsi)
       requiredItems.forEach(req => {
           let qtyToRemove = req.qty;
 
-          // Find items in cart matching this requirement
-          // We might have multiple cart entries for the same ID (unlikely but possible)
-          // or just one entry with qty=5
           for (let i = 0; i < newCart.length; i++) {
               if (newCart[i].id === req.id && !newCart[i].isCombo && qtyToRemove > 0) {
                   
                   if (newCart[i].qty > qtyToRemove) {
-                      // Case: Cart has 5, we need 3. Reduce cart to 2.
                       newCart[i].qty -= qtyToRemove;
                       qtyToRemove = 0;
                   } else {
-                      // Case: Cart has 3, we need 3. Remove item.
-                      // OR Case: Cart has 2, we need 3. Remove item, look for next one.
                       qtyToRemove -= newCart[i].qty;
                       newCart.splice(i, 1);
-                      i--; // Adjust index since we spliced
+                      i--; 
                   }
               }
               if (qtyToRemove === 0) break; 
@@ -403,7 +393,7 @@ const MenuBoard = () => {
           price: parseFloat(combo.price),
           qty: 1,
           isCombo: true, 
-          comboItems: combo.comboItems || [], // Store the breakdown
+          comboItems: combo.comboItems || [], 
           cartId: Math.random().toString(36).substr(2, 9)
       };
 
@@ -583,6 +573,7 @@ const MenuBoard = () => {
 
             <h4 style={{ marginBottom: '10px', color: '#000000' }}>Extras:</h4>
             <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #eee', padding: '10px', borderRadius: '8px', marginBottom: '20px' }}>
+                {/* --- FIX: Only render Available Modifiers --- */}
                 {modifiers.map(mod => (
                     <label key={mod.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f9f9f9', cursor: 'pointer', color: '#000000' }}>
                         <span><input type="checkbox" onChange={() => toggleExtra(mod)} style={{ marginRight: '10px' }} />{mod.name}</span><span style={{ fontWeight: 'bold' }}>+${mod.price}</span>
