@@ -10,6 +10,7 @@ const Suppliers = () => {
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -18,22 +19,27 @@ const Suppliers = () => {
     name: '',
     contact: '',
     address: '',
-    email: '' // Added email field for completeness
+    email: ''
   });
 
-  // --- 1. DATA FETCHING ---
+  // --- RESPONSIVE LISTENER ---
   useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    
     const unsubscribe = onSnapshot(collection(db, "suppliers"), (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Sort alphabetically
       setSuppliers(data.sort((a, b) => (a.name || "").localeCompare(b.name || "")));
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+        unsubscribe();
+        window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
-  // --- 2. HANDLERS ---
+  // --- HANDLERS ---
   const handleSave = async (e) => {
     e.preventDefault();
     if (!formData.name) return alert("Supplier Name is required");
@@ -48,45 +54,32 @@ const Suppliers = () => {
 
     try {
       if (editingId) {
-        // Update existing
         await updateDoc(doc(db, "suppliers", editingId), payload);
-        alert("Supplier Updated Successfully!");
+        alert("Supplier Updated!");
       } else {
-        // Create new
-        await addDoc(collection(db, "suppliers"), {
-          ...payload,
-          createdAt: serverTimestamp()
-        });
+        await addDoc(collection(db, "suppliers"), { ...payload, createdAt: serverTimestamp() });
         alert("New Supplier Added!");
       }
       closeModal();
     } catch (error) {
-      console.error("Error saving supplier:", error);
       alert("Failed to save: " + error.message);
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to delete this supplier?")) {
+    if (window.confirm("Are you sure?")) {
       try {
         await deleteDoc(doc(db, "suppliers", id));
       } catch (error) {
-        console.error("Error deleting:", error);
         alert("Failed to delete.");
       }
     }
   };
 
-  // --- 3. HELPER FUNCTIONS ---
   const openModal = (supplier = null) => {
     if (supplier) {
       setEditingId(supplier.id);
-      setFormData({
-        name: supplier.name,
-        contact: supplier.contact,
-        address: supplier.address,
-        email: supplier.email || ''
-      });
+      setFormData({ name: supplier.name, contact: supplier.contact, address: supplier.address, email: supplier.email || '' });
     } else {
       setEditingId(null);
       setFormData({ name: '', contact: '', address: '', email: '' });
@@ -94,158 +87,140 @@ const Suppliers = () => {
     setIsModalOpen(true);
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setEditingId(null);
-  };
+  const closeModal = () => { setIsModalOpen(false); setEditingId(null); };
 
-  // Filter
   const filteredSuppliers = suppliers.filter(s => 
     (s.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
     (s.contact || "").includes(searchTerm)
   );
 
-  if (loading) return <div style={{padding:'40px'}}>Loading Suppliers...</div>;
+  if (loading) return <div style={{padding:'40px', textAlign: 'center'}}>Loading Directory...</div>;
 
   return (
-    <div style={{ padding: '20px', backgroundColor: '#f4f6f8', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+    <div style={{ padding: isMobile ? '10px' : '20px', backgroundColor: '#f4f6f8', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       
       {/* HEADER */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', marginBottom: '20px', gap: '15px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <button onClick={() => navigate('/')} style={styles.backBtn}>← Back</button>
+            <button onClick={() => navigate('/')} style={styles.backBtn}>←</button>
             <div>
-                <h1 style={{ margin: 0, fontSize: '1.8rem', color: '#333' }}>Supplier Management</h1>
-                <div style={{ color: '#666', fontSize: '0.9rem' }}>Manage Vendor Contacts & Details</div>
+                <h1 style={{ margin: 0, fontSize: isMobile ? '1.2rem' : '1.8rem', color: '#333' }}>Suppliers</h1>
             </div>
         </div>
       </div>
 
       {/* CONTROLS */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', gap: '10px' }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', marginBottom: '20px', gap: '10px' }}>
           <input 
             type="text" 
-            placeholder="Search by Name or Phone..." 
+            placeholder="Search Name or Phone..." 
             value={searchTerm} 
             onChange={e => setSearchTerm(e.target.value)}
-            style={styles.searchInput}
+            style={{...styles.searchInput, width: isMobile ? '100%' : '300px'}}
           />
-          <button onClick={() => openModal()} style={styles.addBtn}>
-              + Add New Supplier
+          <button onClick={() => openModal()} style={{...styles.addBtn, padding: isMobile ? '15px' : '12px 20px'}}>
+              + Add Supplier
           </button>
       </div>
 
-      {/* --- TABLE --- */}
-      <div style={styles.tableContainer}>
-        <table style={styles.table}>
-          <thead style={styles.thead}>
-            <tr>
-              <th style={styles.th}>Company / Name</th>
-              <th style={styles.th}>Contact Person / Phone</th>
-              <th style={styles.th}>Email</th>
-              <th style={styles.th}>Address</th>
-              <th style={{...styles.th, textAlign:'right'}}>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredSuppliers.length === 0 && (
-              <tr><td colSpan="5" style={styles.empty}>No suppliers found.</td></tr>
-            )}
-            {filteredSuppliers.map((sup) => (
-              <tr key={sup.id} style={{ borderBottom: '1px solid #eee' }}>
-                <td style={{...styles.td, fontWeight:'bold'}}>{sup.name}</td>
-                <td style={styles.td}>{sup.contact}</td>
-                <td style={styles.td}>{sup.email || '-'}</td>
-                <td style={styles.td}>{sup.address}</td>
-                <td style={{...styles.td, textAlign:'right'}}>
-                  <button onClick={() => openModal(sup)} style={styles.editBtn}>Edit</button>
-                  <button onClick={() => handleDelete(sup.id)} style={styles.deleteBtn}>Delete</button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {/* --- DATA VIEW --- */}
+      <div style={isMobile ? {} : styles.tableContainer}>
+        {isMobile ? (
+            /* MOBILE CARD VIEW */
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {filteredSuppliers.map(sup => (
+                    <div key={sup.id} style={styles.card}>
+                        <div style={{ fontWeight: 'bold', fontSize: '1.1rem', marginBottom: '5px', color: '#000' }}>{sup.name}</div>
+                        <div style={{ marginBottom: '5px' }}>
+                            <a href={`tel:${sup.contact}`} style={{ color: '#1565C0', textDecoration: 'none', fontWeight: 'bold', fontSize: '0.95rem' }}>
+                                📞 {sup.contact || 'No Number'}
+                            </a>
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '10px' }}>
+                            ✉️ {sup.email || '-'}<br/>
+                            📍 {sup.address || '-'}
+                        </div>
+                        <div style={{ display: 'flex', gap: '10px', paddingTop: '10px', borderTop: '1px solid #eee' }}>
+                            <button onClick={() => openModal(sup)} style={{...styles.editBtn, flex: 1, padding: '10px'}}>Edit</button>
+                            <button onClick={() => handleDelete(sup.id)} style={{...styles.deleteBtn, flex: 1, padding: '10px'}}>Delete</button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        ) : (
+            /* DESKTOP TABLE VIEW */
+            <table style={styles.table}>
+              <thead style={styles.thead}>
+                <tr>
+                  <th style={styles.th}>Company / Name</th>
+                  <th style={styles.th}>Phone</th>
+                  <th style={styles.th}>Email</th>
+                  <th style={styles.th}>Address</th>
+                  <th style={{...styles.th, textAlign:'right'}}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredSuppliers.map((sup) => (
+                  <tr key={sup.id} style={{ borderBottom: '1px solid #eee' }}>
+                    <td style={{...styles.td, fontWeight:'bold'}}>{sup.name}</td>
+                    <td style={styles.td}>{sup.contact}</td>
+                    <td style={styles.td}>{sup.email || '-'}</td>
+                    <td style={styles.td}>{sup.address}</td>
+                    <td style={{...styles.td, textAlign:'right'}}>
+                      <button onClick={() => openModal(sup)} style={styles.editBtn}>Edit</button>
+                      <button onClick={() => handleDelete(sup.id)} style={styles.deleteBtn}>Delete</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+        )}
+        {filteredSuppliers.length === 0 && !loading && (
+            <div style={{padding: '40px', textAlign: 'center', color: '#888'}}>No vendors found.</div>
+        )}
       </div>
 
       {/* --- MODAL --- */}
       {isModalOpen && (
         <div style={styles.modalOverlay}>
-          <div style={styles.modal}>
+          <div style={{...styles.modal, width: isMobile ? '95%' : '450px'}}>
             <h3 style={{marginTop:0}}>{editingId ? 'Edit Supplier' : 'Add New Supplier'}</h3>
             <form onSubmit={handleSave} style={{display:'grid', gap:'15px'}}>
-              <div>
-                <label style={styles.label}>Supplier Name</label>
-                <input 
-                  type="text" required placeholder="e.g. ABC Foods Pvt Ltd"
-                  value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} 
-                  style={styles.input} 
-                />
+              <input type="text" required placeholder="Company Name" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={styles.input} />
+              <div style={{display:'flex', gap:'10px', flexDirection: isMobile ? 'column' : 'row'}}>
+                  <input type="text" required placeholder="Phone" value={formData.contact} onChange={e => setFormData({...formData, contact: e.target.value})} style={{...styles.input, flex: 1}} />
+                  <input type="email" placeholder="Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} style={{...styles.input, flex: 1}} />
               </div>
-              
-              <div style={{display:'flex', gap:'10px'}}>
-                <div style={{flex:1}}>
-                  <label style={styles.label}>Phone / Contact</label>
-                  <input 
-                    type="text" required placeholder="98XXXXXXXX"
-                    value={formData.contact} onChange={e => setFormData({...formData, contact: e.target.value})} 
-                    style={styles.input} 
-                  />
-                </div>
-                <div style={{flex:1}}>
-                  <label style={styles.label}>Email (Optional)</label>
-                  <input 
-                    type="email" placeholder="vendor@email.com"
-                    value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} 
-                    style={styles.input} 
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label style={styles.label}>Address</label>
-                <input 
-                  type="text" placeholder="Full Address"
-                  value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} 
-                  style={styles.input} 
-                />
-              </div>
-
+              <input type="text" placeholder="Full Address" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} style={styles.input} />
               <div style={{display:'flex', gap:'10px', marginTop:'10px'}}>
                 <button type="button" onClick={closeModal} style={styles.cancelBtn}>Cancel</button>
-                <button type="submit" style={styles.saveBtn}>Save Supplier</button>
+                <button type="submit" style={styles.saveBtn}>Save</button>
               </div>
             </form>
           </div>
         </div>
       )}
-
     </div>
   );
 };
 
-// --- STYLES ---
 const styles = {
-    backBtn: { padding: '8px 16px', backgroundColor: 'white', border: '1px solid #ccc', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', color: '#555' },
-    searchInput: { padding: '12px', width: '300px', borderRadius: '6px', border: '1px solid #ccc', fontSize:'1rem' },
-    addBtn: { padding: '12px 20px', backgroundColor: '#D32F2F', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' },
-    
+    backBtn: { padding: '10px 15px', backgroundColor: 'white', border: '1px solid #ccc', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' },
+    searchInput: { padding: '12px', borderRadius: '8px', border: '1px solid #ccc', fontSize:'1rem' },
+    addBtn: { backgroundColor: '#D32F2F', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
+    card: { backgroundColor: 'white', padding: '15px', borderRadius: '10px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' },
     tableContainer: { backgroundColor: 'white', borderRadius: '10px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', overflow: 'hidden' },
     table: { width: '100%', borderCollapse: 'collapse' },
     thead: { backgroundColor: '#f1f1f1' },
     th: { padding: '15px', textAlign: 'left', fontSize: '0.9rem', color: '#555', fontWeight: 'bold' },
     td: { padding: '15px', fontSize: '0.95rem', color: '#333' },
-    empty: { padding: '30px', textAlign: 'center', color: '#999' },
-
-    editBtn: { padding: '6px 12px', backgroundColor: '#E3F2FD', color: '#1565C0', border: 'none', borderRadius: '4px', cursor: 'pointer', marginRight: '8px', fontWeight:'bold' },
+    editBtn: { padding: '6px 12px', backgroundColor: '#E3F2FD', color: '#1565C0', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight:'bold' },
     deleteBtn: { padding: '6px 12px', backgroundColor: '#FFEBEE', color: '#C62828', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight:'bold' },
-
-    // Modal
     modalOverlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
-    modal: { backgroundColor: 'white', padding: '25px', borderRadius: '10px', width: '450px', maxWidth: '90%', boxShadow: '0 4px 10px rgba(0,0,0,0.1)' },
-    label: { display: 'block', marginBottom: '5px', fontWeight: 'bold', fontSize: '0.9rem', color: '#555' },
-    input: { width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ddd', boxSizing: 'border-box' },
-    cancelBtn: { flex: 1, padding: '10px', border: '1px solid #ccc', backgroundColor: 'white', borderRadius: '5px', cursor: 'pointer' },
-    saveBtn: { flex: 1, padding: '10px', border: 'none', backgroundColor: 'black', color: 'white', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' }
+    modal: { backgroundColor: 'white', padding: '25px', borderRadius: '12px' },
+    input: { width: '100%', padding: '12px', borderRadius: '6px', border: '1px solid #ddd', boxSizing: 'border-box' },
+    cancelBtn: { flex: 1, padding: '12px', border: '1px solid #ccc', backgroundColor: 'white', borderRadius: '6px' },
+    saveBtn: { flex: 1, padding: '12px', border: 'none', backgroundColor: 'black', color: 'white', borderRadius: '6px', fontWeight: 'bold' }
 };
 
 export default Suppliers;

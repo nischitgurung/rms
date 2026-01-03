@@ -59,20 +59,14 @@ const AdminMenu = () => {
       return catId || 'Uncategorized';
   };
 
-  // --- 2. CALCULATE DYNAMIC STATS ---
   const calculateStats = (itemsData, ordersData, catsData) => {
-      // 1. Total Dishes
       const total = itemsData.length;
-
-      // 2. Most Dishes Category
       const catCounts = itemsData.reduce((acc, item) => {
-          // KEY FIX: item.categoryId (not itemsData.categoryId)
           let catName = 'Uncategorized';
           if (item.categoryId) {
               const foundCat = catsData.find(c => c.id === item.categoryId);
               catName = foundCat ? foundCat.name : item.categoryId;
           }
-          
           acc[catName] = (acc[catName] || 0) + 1;
           return acc;
       }, {});
@@ -81,7 +75,6 @@ const AdminMenu = () => {
         ? Object.keys(catCounts).reduce((a, b) => catCounts[a] > catCounts[b] ? a : b)
         : '-';
 
-      // 3. Top Sold Item
       const itemSales = {};
       ordersData.forEach(order => {
           if(order.items && Array.isArray(order.items)) {
@@ -98,7 +91,6 @@ const AdminMenu = () => {
       setStats({ total, topSold, mostCategory });
   };
 
-  // --- 3. FORM HANDLERS ---
   const handleEditClick = (item) => {
       let resolvedId = item.categoryId;
       const matchingCat = categories.find(c => c.name === item.categoryId);
@@ -160,7 +152,6 @@ const AdminMenu = () => {
     }
   };
 
-  // --- 4. FILTER LOGIC ---
   const filteredItems = items.filter(item => {
       const matchesText = item.name.toLowerCase().includes(filterText.toLowerCase());
       let matchesCategory = false;
@@ -177,61 +168,62 @@ const AdminMenu = () => {
   const getTypeStyle = (type) => {
       const label = type || 'Veg'; 
       if (label === 'Non-Veg') return { bg: '#FFEBEE', color: '#C62828', border: '#EF9A9A' };
+      if (label === 'Drinks') return { bg: '#E3F2FD', color: '#1565C0', border: '#90CAF9' };
       return { bg: '#E8F5E9', color: '#2E7D32', border: '#A5D6A7' };
   };
 
-  if (loading) return <div style={{padding:'40px'}}>Loading Menu...</div>;
+  if (loading) return <div style={{padding:'40px', textAlign: 'center'}}>Loading Menu...</div>;
 
   return (
-    <div style={{ padding: '20px', backgroundColor: '#f4f6f8', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+    <div style={{ padding: isMobile ? '10px' : '20px', backgroundColor: '#f4f6f8', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       
       {/* HEADER */}
-      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: '20px', gap: '15px' }}>
+      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', marginBottom: '20px', gap: '15px' }}>
         <div>
-            <h1 style={{ margin: 0, fontSize: '1.5rem', textTransform: 'uppercase' }}>Menu Dishes</h1>
-            <div style={{ fontSize: '0.9rem', color: '#666', marginTop: '5px' }}>Manage your restaurant menu items</div>
+            <h1 style={{ margin: 0, fontSize: isMobile ? '1.2rem' : '1.5rem', textTransform: 'uppercase' }}>Menu Dishes</h1>
+            <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '5px' }}>Manage your restaurant menu items</div>
         </div>
         
-        <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto' }}>
-            <button onClick={() => navigate('/')} style={{ flex: isMobile ? 1 : 'none', padding: '10px 20px', border: '1px solid #ccc', background: 'white', borderRadius: '6px', cursor: 'pointer' }}>Back</button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+            <button onClick={() => navigate('/')} style={{ flex: 1, padding: '10px', border: '1px solid #ccc', background: 'white', borderRadius: '6px', fontWeight: 'bold' }}>Back</button>
             <button 
               onClick={() => { setShowForm(!showForm); setEditingId(null); setFormData({ name: '', price: '', categoryId: '', type: 'Veg', description: '', isAvailable: true }); }} 
-              style={{ flex: isMobile ? 2 : 'none', padding: '10px 20px', backgroundColor: 'black', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+              style={{ flex: 2, padding: '10px', backgroundColor: 'black', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold' }}
             >
-              {showForm ? "Close Form" : "+ Add New Dish"}
+              {showForm ? "✕ Close" : "+ Add Dish"}
             </button>
         </div>
       </div>
 
       {/* STATS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px', marginBottom: '30px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '25px' }}>
           <div style={styles.statCard}>
               <div style={styles.statLabel}>Total Dishes</div>
               <div style={styles.statValue}>{stats.total}</div>
           </div>
           <div style={styles.statCard}>
               <div style={styles.statLabel}>Top Sold Item</div>
-              <div style={{...styles.statValue, color: '#4CAF50', fontSize:'1.1rem'}}>{stats.topSold}</div>
+              <div style={{...styles.statValue, color: '#4CAF50', fontSize: isMobile ? '1rem' : '1.1rem'}}>{stats.topSold}</div>
           </div>
           <div style={styles.statCard}>
-              <div style={styles.statLabel}>Most Dishes Category</div>
-              <div style={{...styles.statValue, textTransform:'capitalize'}}>{stats.mostCategory}</div>
+              <div style={styles.statLabel}>Most Popular Cat</div>
+              <div style={{...styles.statValue, textTransform:'capitalize', fontSize: isMobile ? '1rem' : '1.1rem'}}>{stats.mostCategory}</div>
           </div>
       </div>
 
-      {/* FILTER */}
+      {/* FILTER AREA */}
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '10px', marginBottom: '20px' }}>
           <input 
             type="text" 
-            placeholder="Search by Dish Name..." 
+            placeholder="Search Dish Name..." 
             value={filterText}
             onChange={(e) => setFilterText(e.target.value)}
-            style={{ flex: 2, padding: '12px', borderRadius: '6px', border: '1px solid #ddd' }}
+            style={{ flex: 2, padding: '12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '1rem' }}
           />
           <select 
             value={filterCategory}
             onChange={(e) => setFilterCategory(e.target.value)}
-            style={{ flex: 1, padding: '12px', borderRadius: '6px', border: '1px solid #ddd' }}
+            style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #ddd', fontSize: '1rem', backgroundColor: 'white' }}
           >
               <option value="All">All Categories</option>
               {categories.map((cat) => (
@@ -242,16 +234,16 @@ const AdminMenu = () => {
 
       {/* FORM */}
       {showForm && (
-        <div style={{ backgroundColor: 'white', padding: '25px', borderRadius: '12px', marginBottom: '30px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', borderLeft: '5px solid #000' }}>
-          <h3 style={{marginTop:0}}>{editingId ? "Edit Dish" : "Add New Dish"}</h3>
-          <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '15px', maxWidth: '800px' }}>
+        <div style={{ backgroundColor: 'white', padding: isMobile ? '15px' : '25px', borderRadius: '12px', marginBottom: '30px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', borderLeft: '5px solid #000' }}>
+          <h3 style={{marginTop:0, fontSize: '1.1rem'}}>{editingId ? "Edit Dish" : "Add New Dish"}</h3>
+          <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '15px' }}>
             <div style={{display:'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap:'15px'}}>
                 <div>
                     <label style={styles.label}>Dish Name</label>
                     <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={styles.input} />
                 </div>
                 <div>
-                    <label style={styles.label}>Type</label>
+                    <label style={styles.label}>Food Type</label>
                     <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} style={styles.input}>
                         <option value="Veg">Veg</option>
                         <option value="Non-Veg">Non-Veg</option>
@@ -273,38 +265,40 @@ const AdminMenu = () => {
                     ))}
                   </select>
               </div>
-              <div style={{display: 'flex', alignItems:'center', marginTop:'25px'}}>
-                  <label style={{display:'flex', alignItems:'center', cursor:'pointer'}}>
-                      <input type="checkbox" checked={formData.isAvailable} onChange={e => setFormData({...formData, isAvailable: e.target.checked})} style={{marginRight:'10px', width:'20px', height:'20px'}} />
-                      Available?
+              <div style={{display: 'flex', alignItems:'center', marginTop: isMobile ? '0' : '25px', gridColumn: isMobile ? 'span 2' : 'span 1'}}>
+                  <label style={{display:'flex', alignItems:'center', cursor:'pointer', fontSize: '0.9rem'}}>
+                      <input type="checkbox" checked={formData.isAvailable} onChange={e => setFormData({...formData, isAvailable: e.target.checked})} style={{marginRight:'10px', width:'22px', height:'22px'}} />
+                      Available in Menu?
                   </label>
               </div>
             </div>
-            <button type="submit" style={{ padding: '12px', backgroundColor: editingId ? '#2196F3' : '#4CAF50', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}>
-              {editingId ? "Update Dish" : "Save Dish"}
+            <button type="submit" style={{ padding: '15px', backgroundColor: editingId ? '#2196F3' : 'black', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', fontSize: '1rem' }}>
+              {editingId ? "Update Dish" : "Add to Menu"}
             </button>
           </form>
         </div>
       )}
 
-      {/* TABLE */}
+      {/* DATA VIEW */}
       {isMobile ? (
           <div style={{ display: 'grid', gap: '15px' }}>
               {filteredItems.map((item) => {
                   const style = getTypeStyle(item.type);
                   return (
-                    <div key={item.id} style={{ backgroundColor: 'white', padding: '15px', borderRadius: '10px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '10px' }}>
-                            <div style={{fontWeight:'bold', fontSize:'1.1rem'}}>{item.name}</div>
-                            <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold', backgroundColor: style.bg, color: style.color }}>● {item.type || 'Veg'}</span>
+                    <div key={item.id} style={{ backgroundColor: 'white', padding: '15px', borderRadius: '12px', border: '1px solid #eee', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <div style={{fontWeight:'bold', fontSize:'1rem'}}>{item.name}</div>
+                            <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold', backgroundColor: style.bg, color: style.color, border: `1px solid ${style.border}` }}>
+                                {item.type || 'Veg'}
+                            </span>
                         </div>
-                        <div style={{display:'flex', justifyContent:'space-between', color:'#666', fontSize:'0.9rem', marginBottom:'15px'}}>
-                            <span style={{textTransform: 'capitalize'}}>{getCategoryName(item.categoryId)}</span>
+                        <div style={{display:'flex', justifyContent:'space-between', color:'#666', fontSize:'0.85rem', marginBottom:'15px'}}>
+                            <span style={{textTransform: 'capitalize'}}>📂 {getCategoryName(item.categoryId)}</span>
                             <span style={{color:'black', fontWeight:'bold'}}>Rs. {item.price}</span>
                         </div>
                         <div style={{display:'flex', gap:'10px'}}>
-                            <button onClick={() => handleEditClick(item)} style={{flex:1, padding:'8px', background:'#eee', border:'none', borderRadius:'4px', cursor:'pointer'}}>Edit</button>
-                            <button onClick={() => handleDelete(item.id)} style={{flex:1, padding:'8px', background:'#FFEBEE', color:'#D32F2F', border:'none', borderRadius:'4px', cursor:'pointer'}}>Delete</button>
+                            <button onClick={() => handleEditClick(item)} style={{flex:1, padding:'10px', background:'#E3F2FD', color:'#1976D2', border:'none', borderRadius:'6px', fontWeight:'bold'}}>Edit</button>
+                            <button onClick={() => handleDelete(item.id)} style={{flex:1, padding:'10px', background:'#FFEBEE', color:'#D32F2F', border:'none', borderRadius:'6px', fontWeight:'bold'}}>Delete</button>
                         </div>
                     </div>
                   );
@@ -315,21 +309,28 @@ const AdminMenu = () => {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead style={{ backgroundColor: '#f9f9f9', borderBottom: '1px solid #eee' }}>
                   <tr>
-                    <th style={styles.th}>SN</th><th style={styles.th}>Dish Name</th><th style={styles.th}>Price</th><th style={styles.th}>Category</th><th style={styles.th}>Type</th><th style={styles.th}>Available</th><th style={styles.th}>Actions</th>
+                    <th style={styles.th}>Dish Name</th>
+                    <th style={styles.th}>Price</th>
+                    <th style={styles.th}>Category</th>
+                    <th style={styles.th}>Type</th>
+                    <th style={styles.th}>Status</th>
+                    <th style={styles.th}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredItems.map((item, index) => {
+                  {filteredItems.map((item) => {
                     const style = getTypeStyle(item.type);
                     return (
                         <tr key={item.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                        <td style={styles.td}>{index + 1}</td>
-                        <td style={styles.td}><span style={{fontWeight:'bold'}}>{item.name}</span></td>
-                        <td style={styles.td}>Rs. {item.price}</td>
-                        <td style={{...styles.td, textTransform: 'capitalize'}}>{getCategoryName(item.categoryId)}</td>
-                        <td style={styles.td}><span style={{ padding: '4px 10px', borderRadius: '15px', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: style.bg, color: style.color, border: `1px solid ${style.border}`, whiteSpace: 'nowrap' }}>● {item.type || 'Veg'}</span></td>
-                        <td style={styles.td}>{item.isAvailable ? <span style={{color:'green', fontWeight:'bold', backgroundColor:'#E8F5E9', padding:'4px 8px', borderRadius:'4px'}}>Yes</span> : <span style={{color:'red', fontWeight:'bold', backgroundColor:'#FFEBEE', padding:'4px 8px', borderRadius:'4px'}}>No</span>}</td>
-                        <td style={styles.td}><button onClick={() => handleEditClick(item)} style={{marginRight:'10px', padding:'6px 12px', background:'#E3F2FD', color:'#1976D2', border:'none', borderRadius:'4px', cursor:'pointer', fontWeight:'bold'}}>Edit</button><button onClick={() => handleDelete(item.id)} style={{padding:'6px 12px', background:'#FFEBEE', color:'#D32F2F', border:'none', borderRadius:'4px', cursor:'pointer', fontWeight:'bold'}}>Delete</button></td>
+                          <td style={styles.td}><span style={{fontWeight:'bold'}}>{item.name}</span></td>
+                          <td style={styles.td}>Rs. {item.price}</td>
+                          <td style={{...styles.td, textTransform: 'capitalize'}}>{getCategoryName(item.categoryId)}</td>
+                          <td style={styles.td}><span style={{ padding: '4px 10px', borderRadius: '15px', fontSize: '0.8rem', fontWeight: 'bold', backgroundColor: style.bg, color: style.color, border: `1px solid ${style.border}` }}>● {item.type || 'Veg'}</span></td>
+                          <td style={styles.td}>{item.isAvailable ? <span style={{color:'green', fontWeight:'bold'}}>Available</span> : <span style={{color:'red'}}>Hidden</span>}</td>
+                          <td style={styles.td}>
+                            <button onClick={() => handleEditClick(item)} style={{marginRight:'10px', padding:'6px 12px', background:'#E3F2FD', color:'#1976D2', border:'none', borderRadius:'4px', fontWeight:'bold'}}>Edit</button>
+                            <button onClick={() => handleDelete(item.id)} style={{padding:'6px 12px', background:'#FFEBEE', color:'#D32F2F', border:'none', borderRadius:'4px', fontWeight:'bold'}}>Delete</button>
+                          </td>
                         </tr>
                     );
                   })}
@@ -342,13 +343,13 @@ const AdminMenu = () => {
 };
 
 const styles = {
-    statCard: { backgroundColor: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', textAlign: 'center' },
-    statLabel: { color: '#888', fontSize: '0.9rem', marginBottom: '5px' },
-    statValue: { fontSize: '1.5rem', fontWeight: 'bold' },
+    statCard: { backgroundColor: 'white', padding: '15px', borderRadius: '12px', border: '1px solid #eee', textAlign: 'center' },
+    statLabel: { color: '#888', fontSize: '0.8rem', marginBottom: '5px' },
+    statValue: { fontSize: '1.2rem', fontWeight: 'bold' },
     input: { width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '1rem', boxSizing: 'border-box' },
-    label: { display: 'block', marginBottom: '5px', fontSize: '0.9rem', fontWeight: 'bold', color: '#555' },
-    th: { padding: '15px', textAlign: 'left', fontSize: '0.9rem', color: '#666', fontWeight: 'bold' },
-    td: { padding: '15px', fontSize: '0.95rem', color: '#333' }
+    label: { display: 'block', marginBottom: '5px', fontSize: '0.85rem', fontWeight: 'bold', color: '#555' },
+    th: { padding: '15px', textAlign: 'left', fontSize: '0.85rem', color: '#666', fontWeight: 'bold' },
+    td: { padding: '15px', fontSize: '0.9rem', color: '#333' }
 };
 
 export default AdminMenu;

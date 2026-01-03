@@ -8,18 +8,15 @@ const AdminCategory = () => {
   
   // --- STATE ---
   const [categories, setCategories] = useState([]);
-  const [menuItems, setMenuItems] = useState([]); // Store items for stats
-  const [ordersData, setOrdersData] = useState([]); // Store orders for stats
+  const [menuItems, setMenuItems] = useState([]); 
+  const [ordersData, setOrdersData] = useState([]); 
   const [loading, setLoading] = useState(true);
   
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null); 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-  // Stats State
   const [stats, setStats] = useState({ totalDishes: 0, topSold: '-', mostDishesCat: '-' });
-
-  // Form State
   const [formData, setFormData] = useState({ name: '', imageColor: '#e0e0e0' });
 
   // --- 1. DATA FETCHING ---
@@ -27,23 +24,21 @@ const AdminCategory = () => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
 
-    // A. Listen for Categories (Real-time)
     const unsubCategories = onSnapshot(collection(db, "categories"), (snapshot) => {
         const fetchedCats = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setCategories(fetchedCats.sort((a,b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0)));
         setLoading(false);
     });
 
-    // B. Fetch Items & Orders ONCE and store in state
     const fetchStatsData = async () => {
         try {
             const itemSnap = await getDocs(collection(db, "menu_items"));
             const fetchedItems = itemSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setMenuItems(fetchedItems); // Save to state
+            setMenuItems(fetchedItems);
 
             const orderSnap = await getDocs(collection(db, "orders"));
             const fetchedOrders = orderSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setOrdersData(fetchedOrders); // Save to state
+            setOrdersData(fetchedOrders);
         } catch (err) {
             console.error("Stats Error:", err);
         }
@@ -56,7 +51,6 @@ const AdminCategory = () => {
     };
   }, []);
 
-  // --- 2. RE-CALCULATE STATS WHENEVER DATA CHANGES ---
   useEffect(() => {
       if (menuItems.length > 0 || categories.length > 0) {
           calculateStats();
@@ -64,16 +58,12 @@ const AdminCategory = () => {
   }, [categories, menuItems, ordersData]);
 
   const calculateStats = () => {
-      // 1. Most Dishes Category
       const catCounts = menuItems.reduce((acc, item) => {
-          // KEY FIX: Resolve ID to Name using the categories state
           let catName = 'Uncategorized';
           if (item.categoryId) {
               const foundCat = categories.find(c => c.id === item.categoryId);
-              // Fallback: If found use name, else check if it's legacy name data
               catName = foundCat ? foundCat.name : item.categoryId; 
           }
-          
           acc[catName] = (acc[catName] || 0) + 1;
           return acc;
       }, {});
@@ -82,7 +72,6 @@ const AdminCategory = () => {
           ? Object.keys(catCounts).reduce((a, b) => catCounts[a] > catCounts[b] ? a : b) 
           : '-';
 
-      // 2. Top Sold Category
       const catSales = {};
       ordersData.forEach(order => {
           if(order.items && Array.isArray(order.items)) {
@@ -108,7 +97,6 @@ const AdminCategory = () => {
       });
   };
 
-  // --- 3. FORM HANDLERS ---
   const handleEditClick = (cat) => {
       setFormData({ name: cat.name, imageColor: cat.imageColor });
       setEditingId(cat.id);
@@ -151,51 +139,72 @@ const AdminCategory = () => {
       }
   };
 
-  if (loading) return <div style={{padding:'40px'}}>Loading Categories...</div>;
+  if (loading) return <div style={{padding:'40px', textAlign:'center'}}>Loading Categories...</div>;
 
   return (
-    <div style={{ padding: '20px', backgroundColor: '#f4f6f8', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
+    <div style={{ padding: isMobile ? '15px' : '20px', backgroundColor: '#f4f6f8', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
       
       {/* HEADER */}
-      <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', marginBottom: '30px', gap: '15px' }}>
+      <div style={{ 
+          display: 'flex', 
+          flexDirection: isMobile ? 'column' : 'row', 
+          justifyContent: 'space-between', 
+          alignItems: isMobile ? 'stretch' : 'center', 
+          marginBottom: '25px', 
+          gap: '15px' 
+      }}>
         <div>
-            <h1 style={{ margin: 0, fontSize: '1.5rem', textTransform: 'uppercase' }}>Menu Categories</h1>
-            <div style={{ fontSize: '0.9rem', color: '#666', marginTop: '5px' }}>Manage your menu sections</div>
+            <h1 style={{ margin: 0, fontSize: isMobile ? '1.3rem' : '1.5rem', textTransform: 'uppercase' }}>Menu Categories</h1>
+            <div style={{ fontSize: '0.85rem', color: '#666', marginTop: '5px' }}>Manage your menu sections</div>
         </div>
-        <div style={{display:'flex', gap:'10px', width: isMobile ? '100%' : 'auto'}}>
-            <button onClick={() => navigate('/')} style={{ flex: isMobile?1:'none', padding: '10px 20px', background: 'white', border: '1px solid #ccc', borderRadius: '6px', cursor: 'pointer' }}>Back</button>
+        <div style={{display:'flex', gap:'10px'}}>
+            <button onClick={() => navigate('/')} style={{ flex: 1, padding: '10px 15px', background: 'white', border: '1px solid #ccc', borderRadius: '6px', cursor: 'pointer', fontWeight:'bold' }}>Back</button>
             <button 
                 onClick={() => { setShowForm(!showForm); setEditingId(null); setFormData({ name: '', imageColor: '#e0e0e0' }); }} 
-                style={{ flex: isMobile?2:'none', padding: '10px 20px', backgroundColor: 'black', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
+                style={{ flex: 2, padding: '10px 15px', backgroundColor: 'black', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
             >
-                {showForm ? "Close Form" : "+ Add New"}
+                {showForm ? "✕ Close" : "+ Add New"}
             </button>
         </div>
       </div>
 
-      {/* STATS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '15px', marginBottom: '40px' }}>
+      {/* STATS - Responsive Grid */}
+      <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))', 
+          gap: '12px', 
+          marginBottom: '30px' 
+      }}>
           <div style={styles.statCard}>
               <div style={styles.statLabel}>Total Dishes</div>
               <div style={styles.statValue}>{stats.totalDishes}</div>
           </div>
           <div style={styles.statCard}>
               <div style={styles.statLabel}>Top Sold Category</div>
-              <div style={{...styles.statValue, fontSize:'1.2rem', color:'#4CAF50', textTransform:'capitalize'}}>{stats.topSold}</div>
+              <div style={{...styles.statValue, fontSize: isMobile ? '1.1rem' : '1.4rem', color:'#4CAF50', textTransform:'capitalize'}}>{stats.topSold}</div>
           </div>
           <div style={styles.statCard}>
               <div style={styles.statLabel}>Most Dishes Category</div>
-              <div style={{...styles.statValue, fontSize:'1.2rem', textTransform:'capitalize'}}>{stats.mostDishesCat}</div>
+              <div style={{...styles.statValue, fontSize: isMobile ? '1.1rem' : '1.4rem', textTransform:'capitalize'}}>{stats.mostDishesCat}</div>
           </div>
       </div>
 
-      {/* FORM */}
+      {/* FORM - Centered and full width on mobile */}
       {showForm && (
-          <div style={{ backgroundColor: 'white', padding: '25px', borderRadius: '12px', marginBottom: '30px', maxWidth: '500px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)', borderLeft: '5px solid black' }}>
-              <h3 style={{marginTop:0}}>{editingId ? "Edit Category" : "Add New Category"}</h3>
+          <div style={{ 
+              backgroundColor: 'white', 
+              padding: isMobile ? '20px' : '25px', 
+              borderRadius: '12px', 
+              marginBottom: '30px', 
+              maxWidth: isMobile ? '100%' : '500px', 
+              margin: isMobile ? '0 0 30px 0' : '0 auto 30px 0',
+              boxShadow: '0 4px 15px rgba(0,0,0,0.1)', 
+              borderLeft: '5px solid black' 
+          }}>
+              <h3 style={{marginTop:0, fontSize: '1.1rem'}}>{editingId ? "Edit Category" : "Add New Category"}</h3>
               <form onSubmit={handleSubmit} style={{display:'grid', gap:'15px'}}>
                   <div>
-                      <label style={{display:'block', marginBottom:'5px', fontWeight:'bold', fontSize:'0.9rem'}}>Category Name</label>
+                      <label style={{display:'block', marginBottom:'5px', fontWeight:'bold', fontSize:'0.85rem'}}>Category Name</label>
                       <input 
                         type="text" 
                         placeholder="e.g. Desserts, Starters" 
@@ -212,32 +221,36 @@ const AdminCategory = () => {
           </div>
       )}
 
-      {/* LIST */}
+      {/* LIST - Responsive Grid */}
       {categories.length === 0 ? (
-          <div style={{textAlign:'center', padding:'50px', color:'#888', background:'white', borderRadius:'12px'}}>
+          <div style={{textAlign:'center', padding:'50px 20px', color:'#888', background:'white', borderRadius:'12px', border:'1px solid #eee'}}>
               <h3>No Categories Found</h3>
               <p>Click <b>"+ Add New"</b> to create your first category.</p>
           </div>
       ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '25px' }}>
+          <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))', 
+              gap: isMobile ? '12px' : '25px' 
+          }}>
               {categories.map((cat) => (
                   <div key={cat.id} style={styles.catCard}>
                       <div style={{
-                          height: '120px', 
+                          height: isMobile ? '80px' : '120px', 
                           backgroundColor: cat.imageColor || '#f0f0f0', 
                           borderRadius: '8px', 
-                          marginBottom: '15px',
+                          marginBottom: '12px',
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: '3rem',
+                          fontSize: isMobile ? '2rem' : '3rem',
                           color: '#555'
                       }}>
                           {cat.name.toLowerCase().includes('drink') ? '🥤' : 
                            cat.name.toLowerCase().includes('dessert') ? '🍰' : '🍽️'}
                       </div>
-                      <h3 style={{ margin: '0 0 10px 0', fontSize: '1.2rem', color: '#000', textTransform:'capitalize' }}>{cat.name}</h3>
-                      <div style={{display:'flex', gap:'10px', marginTop:'auto'}}>
-                          <button onClick={() => handleEditClick(cat)} style={styles.editBtn}>Edit</button>
-                          <button onClick={() => handleDelete(cat.id)} style={styles.deleteBtn}>Delete</button>
+                      <h3 style={{ margin: '0 0 12px 0', fontSize: isMobile ? '1rem' : '1.2rem', color: '#000', textTransform:'capitalize', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cat.name}</h3>
+                      <div style={{display:'flex', flexDirection: isMobile ? 'column' : 'row', gap: '8px', marginTop:'auto'}}>
+                          <button onClick={() => handleEditClick(cat)} style={{...styles.editBtn, padding: '10px'}}>Edit</button>
+                          <button onClick={() => handleDelete(cat.id)} style={{...styles.deleteBtn, padding: '10px'}}>Delete</button>
                       </div>
                   </div>
               ))}
@@ -248,15 +261,15 @@ const AdminCategory = () => {
 };
 
 const styles = {
-    statCard: { backgroundColor: 'white', padding: '20px', borderRadius: '12px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', textAlign: 'center', border: '1px solid #eee' },
-    statLabel: { color: '#888', fontSize: '0.9rem', marginBottom: '5px' },
-    statValue: { fontSize: '1.6rem', fontWeight: 'bold', color: '#333' },
-    catCard: { backgroundColor: 'white', padding: '15px', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', textAlign: 'center', transition: 'transform 0.2s', display: 'flex', flexDirection: 'column', border: '1px solid #eee' },
+    statCard: { backgroundColor: 'white', padding: '15px', borderRadius: '12px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', textAlign: 'center', border: '1px solid #eee' },
+    statLabel: { color: '#888', fontSize: '0.8rem', marginBottom: '5px' },
+    statValue: { fontSize: '1.4rem', fontWeight: 'bold', color: '#333' },
+    catCard: { backgroundColor: 'white', padding: '12px', borderRadius: '12px', boxShadow: '0 4px 10px rgba(0,0,0,0.05)', textAlign: 'center', display: 'flex', flexDirection: 'column', border: '1px solid #eee' },
     input: { padding: '12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '1rem', width: '100%', boxSizing: 'border-box' },
-    saveBtn: { flex: 1, padding: '12px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' },
+    saveBtn: { flex: 1, padding: '12px', backgroundColor: 'black', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' },
     cancelBtn: { flex: 1, padding: '12px', backgroundColor: 'white', color: '#333', border: '1px solid #ccc', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' },
-    editBtn: { flex: 1, padding: '8px', backgroundColor: '#E3F2FD', color: '#1565C0', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' },
-    deleteBtn: { flex: 1, padding: '8px', backgroundColor: '#FFEBEE', color: '#C62828', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }
+    editBtn: { flex: 1, backgroundColor: '#E3F2FD', color: '#1565C0', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' },
+    deleteBtn: { flex: 1, backgroundColor: '#FFEBEE', color: '#C62828', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold', fontSize: '0.85rem' }
 };
 
 export default AdminCategory;
