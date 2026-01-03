@@ -5,7 +5,8 @@ import { collection, getDocs, addDoc, updateDoc, doc, serverTimestamp, onSnapsho
 
 // --- SUB-COMPONENTS ---
 
-const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, isMobile }) => (
+// UPDATED: Added updateQty and removeItem props
+const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, updateQty, removeItem, isMobile }) => (
     <div style={{ 
         width: isMobile ? '100%' : '320px', 
         height: isMobile ? 'calc(100vh - 60px)' : '100vh',
@@ -23,14 +24,46 @@ const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, isM
         <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
             {cart.length === 0 && <div style={{padding:20, textAlign:'center', color:'#999'}}>Cart is empty</div>}
             {cart.map((item) => (
-                <div key={item.cartId} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '15px', paddingBottom: '10px', borderBottom: '1px dashed #eee' }}>
-                    <div>
-                        <div style={{ fontWeight: 'bold', color: '#000000' }}>{item.name}</div>
-                        {item.selectedExtras?.map(ex => (
-                            <div key={ex.id} style={{ fontSize: '0.8rem', color: '#666666' }}>+ {ex.name}</div>
-                        ))}
+                <div key={item.cartId} style={{ marginBottom: '15px', paddingBottom: '10px', borderBottom: '1px dashed #eee' }}>
+                    
+                    {/* Item Name and Price */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom:'5px' }}>
+                        <div>
+                            <div style={{ fontWeight: 'bold', color: '#000000' }}>
+                                {item.name} <span style={{fontSize:'0.8rem', color:'#4CAF50'}}>x{item.qty}</span>
+                            </div>
+                            {item.selectedExtras?.map(ex => (
+                                <div key={ex.id} style={{ fontSize: '0.8rem', color: '#666666' }}>+ {ex.name}</div>
+                            ))}
+                        </div>
+                        <div style={{ fontWeight: 'bold', color: '#000000' }}>
+                            ${(item.price * item.qty).toFixed(2)}
+                        </div>
                     </div>
-                    <div style={{ fontWeight: 'bold', color: '#000000' }}>${item.price.toFixed(2)}</div>
+
+                    {/* NEW: Quantity Controls & Remove */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
+                        <button 
+                            onClick={() => updateQty(item.cartId, -1)}
+                            style={{ width:'25px', height:'25px', borderRadius:'50%', border:'1px solid #ddd', background:'white', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+                        >-</button>
+                        
+                        <span style={{ fontSize:'0.9rem', fontWeight:'bold' }}>{item.qty}</span>
+                        
+                        <button 
+                            onClick={() => updateQty(item.cartId, 1)}
+                            style={{ width:'25px', height:'25px', borderRadius:'50%', border:'1px solid #ddd', background:'white', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}
+                        >+</button>
+
+                        <button 
+                            onClick={() => removeItem(item.cartId)}
+                            style={{ marginLeft: '10px', background: 'none', border: 'none', cursor: 'pointer', fontSize:'1rem' }}
+                            title="Remove Item"
+                        >
+                            🗑️
+                        </button>
+                    </div>
+
                 </div>
             ))}
         </div>
@@ -38,7 +71,8 @@ const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, isM
         <div style={{ padding: '20px', borderTop: '2px solid #333', backgroundColor: '#fff' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '15px', color: '#000000' }}>
                 <span>Total</span>
-                <span>${cart.reduce((acc, item) => acc + item.price, 0).toFixed(2)}</span>
+                {/* Updated Total Calculation */}
+                <span>${cart.reduce((acc, item) => acc + (item.price * item.qty), 0).toFixed(2)}</span>
             </div>
             <button 
                 onClick={handleSendClick} 
@@ -114,14 +148,12 @@ const MenuView = ({ categories, activeCategory, setActiveCategory, items, handle
 
 // --- NEW DROPDOWN SIDEBAR COMPONENT ---
 const SidebarView = ({ navigate, isMobile }) => {
-    // State to track which section is open
     const [openSection, setOpenSection] = useState(null);
 
     const toggleSection = (sectionName) => {
         setOpenSection(openSection === sectionName ? null : sectionName);
     };
 
-    // Data Structure for the Menu
     const menuOptions = [
         {
             title: "1. Menu",
@@ -301,18 +333,59 @@ const MenuBoard = () => {
     }
   };
 
+  // --- NEW GROUPING LOGIC ---
   const confirmAddToCart = () => {
     const extrasTotal = selectedExtras.reduce((sum, ex) => sum + ex.price, 0);
-    const cartItem = {
+    
+    // Sort extras IDs to create a unique signature for comparison
+    const newExtrasIds = selectedExtras.map(e => e.id).sort().join(',');
+
+    const newItem = {
       ...selectedItem,
-      cartId: Math.random().toString(36).substr(2, 9), 
       price: selectedItem.price + extrasTotal,
       selectedExtras: selectedExtras, 
       qty: 1
     };
-    setCart([...cart, cartItem]);
+
+    // Check if this item with EXACT same extras exists in cart
+    const existingItemIndex = cart.findIndex(item => {
+        const itemExtrasIds = item.selectedExtras ? item.selectedExtras.map(e => e.id).sort().join(',') : '';
+        return item.id === newItem.id && itemExtrasIds === newExtrasIds;
+    });
+
+    if (existingItemIndex !== -1) {
+        // Item exists, update quantity
+        const updatedCart = [...cart];
+        updatedCart[existingItemIndex].qty += 1;
+        setCart(updatedCart);
+        if(isMobile) alert("Quantity Updated!"); 
+    } else {
+        // New item, add to cart with unique cartId
+        newItem.cartId = Math.random().toString(36).substr(2, 9);
+        setCart([...cart, newItem]);
+        if(isMobile) alert("Added to Cart!"); 
+    }
+
     setIsModalOpen(false); 
-    if(isMobile) alert("Added to Cart!"); 
+  };
+
+  // --- NEW: UPDATE QUANTITY HANDLER ---
+  const handleUpdateQty = (cartId, delta) => {
+      setCart(prevCart => {
+          return prevCart.map(item => {
+              if (item.cartId === cartId) {
+                  return { ...item, qty: item.qty + delta };
+              }
+              return item;
+          }).filter(item => item.qty > 0); // Automatically remove if qty goes to 0
+      });
+  };
+
+  // --- NEW: REMOVE ITEM HANDLER ---
+  const handleRemoveItem = (cartId) => {
+      if(window.confirm("Remove this item from cart?")) {
+          setCart(prevCart => prevCart.filter(item => item.cartId !== cartId));
+      }
   };
 
   const handleSendClick = () => {
@@ -360,7 +433,15 @@ const MenuBoard = () => {
       {/* DESKTOP LAYOUT */}
       {!isMobile && (
           <>
-            <CartView cart={cart} initialTableName={initialTableName} initialTableId={initialTableId} handleSendClick={handleSendClick} isMobile={false} />
+            <CartView 
+                cart={cart} 
+                initialTableName={initialTableName} 
+                initialTableId={initialTableId} 
+                handleSendClick={handleSendClick} 
+                updateQty={handleUpdateQty} 
+                removeItem={handleRemoveItem}
+                isMobile={false} 
+            />
             <MenuView categories={categories} activeCategory={activeCategory} setActiveCategory={setActiveCategory} items={items} handleItemClick={handleItemClick} isMobile={false} />
             <SidebarView navigate={navigate} isMobile={false} />
           </>
@@ -370,7 +451,7 @@ const MenuBoard = () => {
       {isMobile && (
           <div style={{ flex: 1, overflow: 'hidden' }}>
               {mobileTab === 'menu' && <MenuView categories={categories} activeCategory={activeCategory} setActiveCategory={setActiveCategory} items={items} handleItemClick={handleItemClick} isMobile={true} />}
-              {mobileTab === 'cart' && <CartView cart={cart} initialTableName={initialTableName} initialTableId={initialTableId} handleSendClick={handleSendClick} isMobile={true} />}
+              {mobileTab === 'cart' && <CartView cart={cart} initialTableName={initialTableName} initialTableId={initialTableId} handleSendClick={handleSendClick} updateQty={handleUpdateQty} removeItem={handleRemoveItem} isMobile={true} />}
               {mobileTab === 'options' && <SidebarView navigate={navigate} isMobile={true} />}
           </div>
       )}
