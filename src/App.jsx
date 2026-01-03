@@ -15,6 +15,7 @@ import AddonManager from './components/AddonManager';
 import DayBook from './components/DayBook';
 import AdminCategory from './components/AdminCategory';
 import AdminCombos from './components/AdminCombos';
+import Transactions from './components/Transactions';
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -112,7 +113,7 @@ function App() {
       } />
 
       {/* Route other finance links to DayBook for now */}
-      <Route path="/finance-transactions" element={<ProtectedRoute><DayBook /></ProtectedRoute>} />
+      <Route path="/finance-transactions" element={<ProtectedRoute><Transactions /></ProtectedRoute>} />
       <Route path="/finance-sales" element={<ProtectedRoute><DayBook /></ProtectedRoute>} />
       <Route path="/finance-income" element={<ProtectedRoute><DayBook /></ProtectedRoute>} />
 
