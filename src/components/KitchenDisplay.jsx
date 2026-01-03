@@ -22,7 +22,8 @@ const KitchenDisplay = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const allOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      // Filter: Hide Completed & Paid
+      // Filter: Hide Completed & Paid orders from the main board
+      // We keep them in DB, but KDS only cares about active cooking tasks
       const kitchenOrders = allOrders.filter(o => 
         o.status !== 'COMPLETED' && 
         o.status !== 'PAID'
@@ -57,16 +58,28 @@ const KitchenDisplay = () => {
         
         <div style={styles.itemList}>
             {order.items.map((item, index) => (
-                <div key={index} style={{marginBottom:'8px', fontSize:'1rem', display:'flex', justifyContent:'space-between'}}>
-                    <div>
-                        <span style={{fontWeight:'bold', marginRight:'8px'}}>{item.qty}x</span>
-                        <span>{item.name}</span>
+                <div key={index} style={{marginBottom:'8px', fontSize:'1rem'}}>
+                    <div style={{display:'flex', justifyContent:'space-between'}}>
+                        <div>
+                            <span style={{fontWeight:'bold', marginRight:'8px'}}>{item.qty}x</span>
+                            <span>{item.name}</span>
+                        </div>
                     </div>
+
                     {/* Modifiers */}
                     {item.selectedExtras && item.selectedExtras.length > 0 && (
-                        <div style={{fontSize:'0.85rem', color:'#D32F2F', marginTop:'2px', fontStyle:'italic'}}>
+                        <div style={{fontSize:'0.85rem', color:'#D32F2F', marginTop:'2px', fontStyle:'italic', paddingLeft:'20px'}}>
                             {item.selectedExtras.map(e => `+ ${e.name}`).join(', ')}
                         </div>
+                    )}
+
+                    {/* COMBO BREAKDOWN (ADDED FOR KITCHEN VISIBILITY) */}
+                    {item.isCombo && item.comboItems && (
+                         <div style={{ marginTop: '4px', paddingLeft: '15px', borderLeft: '3px solid #ddd', color:'#555', fontSize:'0.9rem' }}>
+                            {item.comboItems.map((sub, i) => (
+                                <div key={i} style={{marginBottom:'2px'}}>• {sub.qty}x {sub.name}</div>
+                            ))}
+                         </div>
                     )}
                 </div>
             ))}
