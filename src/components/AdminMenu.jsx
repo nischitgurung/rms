@@ -206,7 +206,7 @@ const AdminMenu = () => {
               <div style={{...styles.statValue, color: '#4CAF50', fontSize: isMobile ? '1rem' : '1.1rem'}}>{stats.topSold}</div>
           </div>
           <div style={styles.statCard}>
-              <div style={styles.statLabel}>Most Popular Cat</div>
+              <div style={styles.statLabel}>Most Popular Dish</div>
               <div style={{...styles.statValue, textTransform:'capitalize', fontSize: isMobile ? '1rem' : '1.1rem'}}>{stats.mostCategory}</div>
           </div>
       </div>

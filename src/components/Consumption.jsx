@@ -117,11 +117,9 @@ const Consumption = () => {
 
   return (
     <div style={{ padding: isMobile ? '10px' : '20px', backgroundColor: '#f4f6f8', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
-      
-      {/* HEADER */}
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', gap: '15px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px', width: isMobile ? '100%' : 'auto' }}>
-            <button onClick={() => navigate('/')} style={styles.backBtn}>←</button>
+            <button onClick={() => navigate('/')} style={styles.backBtn}>← Back</button>
             <h1 style={{ margin: 0, fontSize: isMobile ? '1.2rem' : '1.8rem', color: '#333' }}>Consumption</h1>
         </div>
         <div style={{ display: 'flex', backgroundColor: 'white', borderRadius: '8px', overflow: 'hidden', border: '1px solid #ddd', width: isMobile ? '100%' : 'auto' }}>
@@ -130,11 +128,8 @@ const Consumption = () => {
         </div>
       </div>
 
-      {/* --- RECIPE BUILDER --- */}
       {activeTab === 'RECIPES' && (
           <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '20px' }}>
-              
-              {/* LEFT: Menu Items (Hidden on mobile if dish is selected) */}
               {(!isMobile || !selectedDish) && (
                 <div style={{ ...styles.card, flex: 1 }}>
                     <h3 style={{ marginTop: 0, fontSize: '1rem' }}>Select Dish</h3>
@@ -150,14 +145,12 @@ const Consumption = () => {
                 </div>
               )}
 
-              {/* RIGHT: Recipe Details */}
-              {(selectedDish) && (
+              {selectedDish && (
                 <div style={{ ...styles.card, flex: 2 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
                         <h2 style={{ margin: 0, color:'#2196F3', fontSize: '1.2rem' }}>{selectedDish.name}</h2>
                         {isMobile && <button onClick={() => setSelectedDish(null)} style={styles.closeBtn}>Back to List</button>}
                     </div>
-
                     <div style={{ overflowX: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px', minWidth: '300px' }}>
                             <thead style={{ backgroundColor: '#f9f9f9' }}>
@@ -175,8 +168,6 @@ const Consumption = () => {
                             </tbody>
                         </table>
                     </div>
-
-                    {/* ADD FORM */}
                     <div style={{ backgroundColor: '#f0f4f8', padding: '15px', borderRadius: '8px' }}>
                         <form onSubmit={handleAddIngredient} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                             <label style={styles.label}>Select Raw Material</label>
@@ -186,7 +177,6 @@ const Consumption = () => {
                                     <option key={s.id} value={s.id}>{s.itemName} ({s.unit})</option>
                                 ))}
                             </select>
-                            
                             <label style={styles.label}>Quantity {ingredientForm.stockId ? `(${getSelectedStockUnit()})` : ''}</label>
                             <div style={{ display: 'flex', gap: '10px' }}>
                                 <input type="number" step="0.001" required placeholder="0.00" value={ingredientForm.qty} onChange={e => setIngredientForm({...ingredientForm, qty: e.target.value})} style={{...styles.input, flex: 1}} />
@@ -199,7 +189,6 @@ const Consumption = () => {
           </div>
       )}
 
-      {/* --- REPORT VIEW --- */}
       {activeTab === 'REPORT' && (
           <div style={styles.card}>
               <h2 style={{ marginTop: 0, fontSize: '1.2rem' }}>Theoretical Consumption (Today)</h2>
@@ -227,7 +216,6 @@ const Consumption = () => {
   );
 };
 
-// --- STYLES ---
 const styles = {
     backBtn: { padding: '10px 15px', backgroundColor: 'white', border: '1px solid #ccc', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' },
     closeBtn: { padding: '5px 10px', backgroundColor: '#333', color: 'white', border: 'none', borderRadius: '4px', fontSize: '0.8rem' },

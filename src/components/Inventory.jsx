@@ -2,16 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp } from 'firebase/firestore';
-import emailjs from '@emailjs/browser';
 
 const Inventory = () => {
   const navigate = useNavigate();
   const location = useLocation();
-
-  // --- CONFIG ---
-  const SERVICE_ID = "service_lt5byrp"; 
-  const TEMPLATE_ID = "template_oy39nmc";
-  const PUBLIC_KEY = "q6gnSNf0gppPaEkI3";
 
   // --- STATE ---
   const [activeTab, setActiveTab] = useState('STOCK');
@@ -51,54 +45,46 @@ const Inventory = () => {
     };
   }, [location]);
 
-  // --- EMAIL LOGIC ---
-  const checkAndSendMail = (itemData) => {
-      const currentQty = parseFloat(itemData.quantity);
-      const minQty = parseFloat(itemData.minStock);
-
-      if (currentQty <= minQty) {
-          const supplier = suppliers.find(s => s.id === itemData.supplierId);
-          if (supplier && supplier.email) {
-              const templateParams = { to_email: supplier.email, vendor_name: supplier.name, item_name: itemData.itemName, current_qty: itemData.quantity, unit: itemData.unit };
-              emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, PUBLIC_KEY)
-                  .then(() => alert(`⚠️ ALERT: Low stock email sent to ${supplier.name}`))
-                  .catch((err) => console.error('FAILED:', err));
-          }
-      }
-  };
-
   // --- HANDLERS ---
   const handleSaveStock = async (e) => {
     e.preventDefault();
-    const payload = { itemName: stockForm.itemName, category: stockForm.category, quantity: parseFloat(stockForm.quantity), unit: stockForm.unit, minStock: parseFloat(stockForm.minStock) || 0, supplierId: stockForm.supplierId, updatedAt: serverTimestamp() };
+    const payload = { 
+        itemName: stockForm.itemName, 
+        category: stockForm.category, 
+        quantity: parseFloat(stockForm.quantity), 
+        unit: stockForm.unit, 
+        minStock: parseFloat(stockForm.minStock) || 0, 
+        supplierId: stockForm.supplierId, 
+        updatedAt: serverTimestamp() 
+    };
+
     try {
         if (editingId) {
             await updateDoc(doc(db, "inventory", editingId), payload);
-            checkAndSendMail(payload); 
+            alert("Stock Updated Successfully");
         } else {
             await addDoc(collection(db, "inventory"), { ...payload, createdAt: serverTimestamp() });
-            checkAndSendMail(payload);
+            alert("New Item Added to Inventory");
         }
         closeModal();
-    } catch (error) { alert("Error saving stock: " + error.message); }
-  };
-
-  const handleDeleteStock = async (id) => {
-      if(window.confirm("Delete item?")) await deleteDoc(doc(db, "inventory", id));
+    } catch (error) { 
+        alert("Error saving stock: " + error.message); 
+    }
   };
 
   const handleSaveSupplier = async (e) => {
       e.preventDefault();
-      const payload = { name: supplierForm.name, contact: supplierForm.contact, address: supplierForm.address, email: supplierForm.email };
+      const payload = { 
+          name: supplierForm.name, 
+          contact: supplierForm.contact, 
+          address: supplierForm.address, 
+          email: supplierForm.email 
+      };
       try {
           if (editingId) await updateDoc(doc(db, "suppliers", editingId), payload);
           else await addDoc(collection(db, "suppliers"), payload);
           closeModal();
       } catch (error) { alert("Error saving supplier"); }
-  };
-
-  const handleDeleteSupplier = async (id) => {
-      if(window.confirm("Delete supplier?")) await deleteDoc(doc(db, "suppliers", id));
   };
 
   const openEditModal = (item, type) => {
@@ -124,29 +110,23 @@ const Inventory = () => {
 
   return (
     <div style={{ padding: isMobile ? '10px' : '20px', backgroundColor: '#f4f6f8', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
-      
-      {/* HEADER */}
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', marginBottom: '20px', gap: '15px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-            <button onClick={() => navigate('/')} style={styles.backBtn}>←</button>
+            <button onClick={() => navigate('/')} style={styles.backBtn}>← Back</button>
             <h1 style={{ margin: 0, fontSize: isMobile ? '1.2rem' : '1.8rem', color: '#333' }}>Inventory</h1>
         </div>
-        
         <div style={{ display: 'flex', backgroundColor: 'white', borderRadius: '8px', overflow: 'hidden', border: '1px solid #ddd' }}>
             <button onClick={() => setActiveTab('STOCK')} style={{ ...styles.tabBtn, flex: 1, backgroundColor: activeTab === 'STOCK' ? 'black' : 'white', color: activeTab === 'STOCK' ? 'white' : 'black' }}>Stock</button>
             <button onClick={() => setActiveTab('SUPPLIERS')} style={{ ...styles.tabBtn, flex: 1, backgroundColor: activeTab === 'SUPPLIERS' ? 'black' : 'white', color: activeTab === 'SUPPLIERS' ? 'white' : 'black' }}>Suppliers</button>
         </div>
       </div>
 
-      {/* CONTROLS */}
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', marginBottom: '20px', gap: '10px' }}>
           <input type="text" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{...styles.searchInput, width: isMobile ? '100%' : '300px'}} />
           <button onClick={() => setIsModalOpen(true)} style={{...styles.addBtn, padding: isMobile ? '15px' : '10px 20px'}}>{activeTab === 'STOCK' ? '+ Add Item' : '+ Add Supplier'}</button>
       </div>
 
-      {/* --- DATA VIEW --- */}
       {isMobile ? (
-        /* MOBILE CARD VIEW */
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
             {(activeTab === 'STOCK' ? filteredInventory : filteredSuppliers).map(item => {
                 const isLow = activeTab === 'STOCK' && item.quantity <= (item.minStock || 5);
@@ -156,40 +136,30 @@ const Inventory = () => {
                             <span style={{ fontWeight: 'bold', fontSize: '1.1rem' }}>{activeTab === 'STOCK' ? item.itemName : item.name}</span>
                             {activeTab === 'STOCK' && <span style={{ fontWeight: 'bold', color: isLow ? 'red' : 'green' }}>{item.quantity} {item.unit}</span>}
                         </div>
-                        <div style={{ fontSize: '0.85rem', color: '#666', marginBottom: '12px' }}>
-                            {activeTab === 'STOCK' ? `Category: ${item.category || 'General'} | Supplier: ${getSupplierName(item.supplierId)}` : `Contact: ${item.contact || '-'} | Email: ${item.email || '-'}`}
-                        </div>
                         <div style={{ display: 'flex', gap: '10px' }}>
                             <button onClick={() => openEditModal(item, activeTab)} style={{ ...styles.editBtn, flex: 1, padding: '10px' }}>Edit</button>
-                            <button onClick={() => activeTab === 'STOCK' ? handleDeleteStock(item.id) : handleDeleteSupplier(item.id)} style={{ ...styles.deleteBtn, flex: 1, padding: '10px' }}>Delete</button>
                         </div>
                     </div>
                 );
             })}
         </div>
       ) : (
-        /* DESKTOP TABLE VIEW */
         <div style={styles.tableContainer}>
             <table style={styles.table}>
-                <thead style={styles.thead}>
-                    <tr>
+                <thead>
+                    <tr style={{backgroundColor: '#f1f1f1'}}>
                         <th style={styles.th}>{activeTab === 'STOCK' ? 'Item Name' : 'Supplier Name'}</th>
                         <th style={styles.th}>{activeTab === 'STOCK' ? 'Available' : 'Contact'}</th>
-                        <th style={styles.th}>{activeTab === 'STOCK' ? 'Unit' : 'Email'}</th>
-                        <th style={styles.th}>{activeTab === 'STOCK' ? 'Supplier' : 'Address'}</th>
-                        <th style={{...styles.th, textAlign:'right'}}>Actions</th>
+                        <th style={styles.th}>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {(activeTab === 'STOCK' ? filteredInventory : filteredSuppliers).map(item => (
                         <tr key={item.id} style={{ borderBottom: '1px solid #eee' }}>
                             <td style={{...styles.td, fontWeight:'bold'}}>{activeTab === 'STOCK' ? item.itemName : item.name}</td>
-                            <td style={styles.td}>{activeTab === 'STOCK' ? item.quantity : item.contact}</td>
-                            <td style={styles.td}>{activeTab === 'STOCK' ? item.unit : item.email}</td>
-                            <td style={styles.td}>{activeTab === 'STOCK' ? getSupplierName(item.supplierId) : item.address}</td>
-                            <td style={{...styles.td, textAlign:'right'}}>
+                            <td style={styles.td}>{activeTab === 'STOCK' ? item.quantity + ' ' + item.unit : item.contact}</td>
+                            <td style={styles.td}>
                                 <button onClick={() => openEditModal(item, activeTab)} style={styles.editBtn}>Edit</button>
-                                <button onClick={() => activeTab === 'STOCK' ? handleDeleteStock(item.id) : handleDeleteSupplier(item.id)} style={styles.deleteBtn}>Del</button>
                             </td>
                         </tr>
                     ))}
@@ -198,7 +168,6 @@ const Inventory = () => {
         </div>
       )}
 
-      {/* --- MODAL --- */}
       {isModalOpen && (
           <div style={styles.modalOverlay}>
               <div style={{...styles.modal, width: isMobile ? '95%' : '400px'}}>
@@ -211,7 +180,7 @@ const Inventory = () => {
                               <div style={{flex:1}}><label style={styles.label}>Qty</label><input type="number" step="0.01" required value={stockForm.quantity} onChange={e => setStockForm({...stockForm, quantity: e.target.value})} style={styles.input} /></div>
                               <div style={{flex:1}}><label style={styles.label}>Unit</label>
                                 <select value={stockForm.unit} onChange={e => setStockForm({...stockForm, unit: e.target.value})} style={styles.input}>
-                                    <option value="kg">kg</option><option value="ltr">ltr</option><option value="pcs">pcs</option><option value="pkt">pkt</option>
+                                    <option value="kg">kg</option><option value="ltr">ltr</option><option value="pcs">pcs</option>
                                 </select>
                               </div>
                           </div>
@@ -253,11 +222,9 @@ const styles = {
     card: { backgroundColor: 'white', padding: '15px', borderRadius: '10px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' },
     tableContainer: { backgroundColor: 'white', borderRadius: '10px', overflow: 'hidden', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' },
     table: { width: '100%', borderCollapse: 'collapse' },
-    thead: { backgroundColor: '#f1f1f1' },
     th: { padding: '12px 15px', textAlign: 'left', fontSize: '0.85rem', color: '#555', fontWeight: 'bold' },
     td: { padding: '12px 15px', fontSize: '0.9rem', color: '#333' },
     editBtn: { backgroundColor: '#E3F2FD', color: '#1565C0', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight:'bold' },
-    deleteBtn: { backgroundColor: '#FFEBEE', color: '#C62828', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight:'bold' },
     modalOverlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
     modal: { backgroundColor: 'white', padding: '25px', borderRadius: '12px' },
     label: { fontSize: '0.8rem', fontWeight: 'bold', color: '#555' },
