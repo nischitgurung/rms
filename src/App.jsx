@@ -14,7 +14,7 @@ import Inventory from './components/Inventory';
 import AddonManager from './components/AddonManager';
 import DayBook from './components/DayBook';
 import AdminCategory from './components/AdminCategory';
-
+import AdminCombos from './components/AdminCombos';
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -73,12 +73,11 @@ function App() {
       } />
 
       {/* Placeholder for Combos (matches sidebar to prevent 404) */}
-      <Route path="/admin-combos" element={
-        <ProtectedRoute>
-           <div style={{padding:20}}>Combo Management (Coming Soon)</div>
-        </ProtectedRoute>
-      } />
-
+     <Route path="/admin-combos" element={
+  <ProtectedRoute>
+    <AdminCombos />
+  </ProtectedRoute>
+} />
       {/* --- TABLES & ORDERS --- */}
       <Route path="/tables" element={
         <ProtectedRoute>

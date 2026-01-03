@@ -1,235 +1,291 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { db } from '../firebase';
-import { collection, getDocs, addDoc, updateDoc, doc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase'; // Ensure this path is correct for your project
+import { 
+  collection, 
+  getDocs, 
+  addDoc, 
+  updateDoc, 
+  doc, 
+  serverTimestamp, 
+  onSnapshot 
+} from 'firebase/firestore';
 
-// --- SUB-COMPONENTS ---
-
-const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, updateQty, removeItem, isMobile }) => (
-    <div style={{ 
-        width: isMobile ? '100%' : '320px', 
-        height: isMobile ? 'calc(100vh - 60px)' : '100vh',
-        backgroundColor: 'white', 
-        borderRight: isMobile ? 'none' : '1px solid #ddd', 
-        display: 'flex', flexDirection: 'column' 
-    }}>
-        <div style={{ padding: '20px', borderBottom: '1px solid #eee', backgroundColor: '#fff' }}>
-            <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#000000' }}>CART</h2>
-            <div style={{ fontSize: '0.9rem', color: '#666666' }}>
-                Order for: <strong>{initialTableName === 'Walk-in' ? 'Select Table Next ->' : initialTableName}</strong>
-            </div>
-        </div>
-        
-        <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
-            {cart.length === 0 && <div style={{padding:20, textAlign:'center', color:'#999'}}>Cart is empty</div>}
-            {cart.map((item) => (
-                <div key={item.cartId} style={{ marginBottom: '15px', paddingBottom: '10px', borderBottom: '1px dashed #eee' }}>
-                    
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom:'5px' }}>
-                        <div>
-                            <div style={{ fontWeight: 'bold', color: '#000000' }}>
-                                {item.name} <span style={{fontSize:'0.8rem', color:'#4CAF50'}}>x{item.qty}</span>
-                            </div>
-                            {item.selectedExtras?.map(ex => (
-                                <div key={ex.id} style={{ fontSize: '0.8rem', color: '#666666' }}>+ {ex.name}</div>
-                            ))}
-                        </div>
-                        <div style={{ fontWeight: 'bold', color: '#000000' }}>
-                            ${(item.price * item.qty).toFixed(2)}
-                        </div>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
-                        <button onClick={() => updateQty(item.cartId, -1)} style={{ width:'25px', height:'25px', borderRadius:'50%', border:'1px solid #ddd', background:'white', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>-</button>
-                        <span style={{ fontSize:'0.9rem', fontWeight:'bold' }}>{item.qty}</span>
-                        <button onClick={() => updateQty(item.cartId, 1)} style={{ width:'25px', height:'25px', borderRadius:'50%', border:'1px solid #ddd', background:'white', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>+</button>
-                        <button onClick={() => removeItem(item.cartId)} style={{ marginLeft: '10px', background: 'none', border: 'none', cursor: 'pointer', fontSize:'1rem' }} title="Remove Item">🗑️</button>
-                    </div>
-
-                </div>
-            ))}
-        </div>
-
-        <div style={{ padding: '20px', borderTop: '2px solid #333', backgroundColor: '#fff' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '15px', color: '#000000' }}>
-                <span>Total</span>
-                <span>${cart.reduce((acc, item) => acc + (item.price * item.qty), 0).toFixed(2)}</span>
-            </div>
-            <button 
-                onClick={handleSendClick} 
-                style={{ width: '100%', padding: '15px', backgroundColor: 'black', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}
-            >
-                {initialTableId === 'Walk-in' ? 'SELECT TABLE & SEND' : 'SEND TO KITCHEN'}
-            </button>
-        </div>
+// ==========================================
+// 1. CART VIEW COMPONENT
+// ==========================================
+const CartView = ({ 
+  cart, 
+  initialTableName, 
+  initialTableId, 
+  handleSendClick, 
+  updateQty, 
+  removeItem, 
+  isMobile, 
+  detectedCombos, 
+  applyCombo 
+}) => (
+  <div style={{ 
+    width: isMobile ? '100%' : '320px', 
+    height: isMobile ? 'calc(100vh - 60px)' : '100vh',
+    backgroundColor: 'white', 
+    borderRight: isMobile ? 'none' : '1px solid #ddd', 
+    display: 'flex', flexDirection: 'column' 
+  }}>
+    {/* Header */}
+    <div style={{ padding: '20px', borderBottom: '1px solid #eee', backgroundColor: '#fff' }}>
+      <h2 style={{ margin: 0, fontSize: '1.2rem', color: '#000000' }}>CART</h2>
+      <div style={{ fontSize: '0.9rem', color: '#666666' }}>
+        Order for: <strong>{initialTableName === 'Walk-in' ? 'Select Table Next ->' : initialTableName}</strong>
+      </div>
     </div>
+
+    {/* Combo Detection Banner */}
+    {detectedCombos.length > 0 && (
+      <div style={{ backgroundColor: '#E8F5E9', padding: '10px', borderBottom: '1px solid #C8E6C9' }}>
+        {detectedCombos.map(combo => (
+          <div key={combo.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+            <span style={{ fontSize: '0.9rem', color: '#2E7D32', fontWeight: 'bold' }}>
+              ✨ {combo.name} Detected!
+            </span>
+            <button 
+              onClick={() => applyCombo(combo)}
+              style={{ padding: '5px 10px', backgroundColor: '#2E7D32', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
+            >
+              Apply Save
+            </button>
+          </div>
+        ))}
+      </div>
+    )}
+    
+    {/* Cart Items List */}
+    <div style={{ flex: 1, overflowY: 'auto', padding: '10px' }}>
+      {cart.length === 0 && <div style={{padding:20, textAlign:'center', color:'#999'}}>Cart is empty</div>}
+      
+      {cart.map((item) => (
+        <div key={item.cartId} style={{ marginBottom: '15px', paddingBottom: '10px', borderBottom: '1px dashed #eee' }}>
+          
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom:'5px' }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 'bold', color: '#000000' }}>
+                {item.isCombo ? '🎁 ' : ''}{item.name} 
+                <span style={{fontSize:'0.8rem', color:'#4CAF50'}}> x{item.qty}</span>
+              </div>
+              
+              {/* Selected Extras */}
+              {item.selectedExtras?.map(ex => (
+                <div key={ex.id} style={{ fontSize: '0.8rem', color: '#666666' }}>+ {ex.name}</div>
+              ))}
+
+              {/* CRITICAL: Show Items INSIDE the Combo for the Kitchen */}
+              {item.isCombo && item.comboItems && (
+                <div style={{ marginTop: '4px', paddingLeft: '8px', borderLeft: '2px solid #eee' }}>
+                   {item.comboItems.map((subItem, idx) => (
+                     <div key={idx} style={{ fontSize: '0.75rem', color: '#555' }}>
+                       • {subItem.qty}x {subItem.name}
+                     </div>
+                   ))}
+                </div>
+              )}
+            </div>
+
+            <div style={{ fontWeight: 'bold', color: '#000000', marginLeft: '10px' }}>
+              ${(item.price * item.qty).toFixed(2)}
+            </div>
+          </div>
+
+          {/* Qty Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
+            <button onClick={() => updateQty(item.cartId, -1)} style={qtyBtnStyle}>-</button>
+            <span style={{ fontSize:'0.9rem', fontWeight:'bold' }}>{item.qty}</span>
+            <button onClick={() => updateQty(item.cartId, 1)} style={qtyBtnStyle}>+</button>
+            <button onClick={() => removeItem(item.cartId)} style={{ marginLeft: '10px', background: 'none', border: 'none', cursor: 'pointer', fontSize:'1rem' }} title="Remove Item">🗑️</button>
+          </div>
+
+        </div>
+      ))}
+    </div>
+
+    {/* Footer / Send Button */}
+    <div style={{ padding: '20px', borderTop: '2px solid #333', backgroundColor: '#fff' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '15px', color: '#000000' }}>
+        <span>Total</span>
+        <span>${cart.reduce((acc, item) => acc + (item.price * item.qty), 0).toFixed(2)}</span>
+      </div>
+      <button 
+        onClick={handleSendClick} 
+        style={{ width: '100%', padding: '15px', backgroundColor: 'black', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem' }}
+      >
+        {initialTableId === 'Walk-in' ? 'SELECT TABLE & SEND' : 'SEND TO KITCHEN'}
+      </button>
+    </div>
+  </div>
 );
 
-// --- UPDATED MENU VIEW (Fixes Filtering Issue) ---
+// ==========================================
+// 2. MENU VIEW COMPONENT
+// ==========================================
 const MenuView = ({ categories, activeCategory, setActiveCategory, items, handleItemClick, isMobile }) => {
+  
+  // Filter Logic
+  const getFilteredItems = () => {
+    if (activeCategory === 'All') return items;
+    const currentCat = categories.find(c => c.id === activeCategory);
+    const currentCatName = currentCat ? currentCat.name : '';
+    return items.filter(item => {
+      return item.categoryId === activeCategory || item.categoryId === currentCatName;
+    });
+  };
 
-    // 1. SMART FILTER: Matches either ID or Name to support old and new data
-    const getFilteredItems = () => {
-        if (activeCategory === 'All') return items;
+  const getCount = (cat) => {
+    return items.filter(item => item.categoryId === cat.id || item.categoryId === cat.name).length;
+  };
 
-        // Find the currently selected category object to get its Name
-        const currentCat = categories.find(c => c.id === activeCategory);
-        const currentCatName = currentCat ? currentCat.name : '';
+  const filteredItems = getFilteredItems();
 
-        return items.filter(item => {
-            // Check 1: Does dish have the Category ID? (New Data)
-            const matchID = item.categoryId === activeCategory;
-            // Check 2: Does dish have the Category Name? (Old Data)
-            const matchName = item.categoryId === currentCatName;
-            
-            return matchID || matchName;
-        });
-    };
+  return (
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: isMobile ? 'calc(100vh - 60px)' : '100vh' }}>
+      
+      {/* Category Tabs */}
+      <div style={{ 
+        padding: '15px', backgroundColor: 'white', borderBottom: '1px solid #ddd', 
+        display: 'flex', gap: '10px', overflowX: 'auto', whiteSpace: 'nowrap',
+        WebkitOverflowScrolling: 'touch' 
+      }}>
+        <button 
+          onClick={() => setActiveCategory('All')}
+          style={{ ...catBtnStyle, backgroundColor: activeCategory === 'All' ? 'black' : 'white', color: activeCategory === 'All' ? 'white' : 'black' }}
+        >
+          All Items ({items.length})
+        </button>
+        {categories.map(cat => (
+           <button 
+            key={cat.id} 
+            onClick={() => setActiveCategory(cat.id)}
+            style={{ ...catBtnStyle, backgroundColor: activeCategory === cat.id ? 'black' : 'white', color: activeCategory === cat.id ? 'white' : 'black' }}
+          >
+            {cat.name} ({getCount(cat)})
+          </button>
+        ))}
+      </div>
 
-    // 2. HELPER: Calculate Count for Buttons
-    const getCount = (cat) => {
-        return items.filter(item => item.categoryId === cat.id || item.categoryId === cat.name).length;
-    };
+      {/* Grid of Items */}
+      <div style={{ 
+        flex: 1, padding: '15px', overflowY: 'auto', 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', 
+        gap: '15px', alignContent: 'start'
+      }}>
+        {filteredItems.map(item => (
+          <div 
+            key={item.id} 
+            onClick={() => handleItemClick(item)}
+            style={{ 
+              backgroundColor: 'white', borderRadius: '12px', padding: '15px', 
+              textAlign: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', 
+              cursor: 'pointer', border: '1px solid #eee',
+              display: 'flex', flexDirection: 'column', 
+              minHeight: '120px'
+            }}
+          >
+            <h4 style={{ margin: '0 0 5px 0', fontSize: '1rem', color: '#000000' }}>
+              {item.isCombo && '🎁 '}{item.name}
+            </h4>
 
-    const filteredItems = getFilteredItems();
-
-    return (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: isMobile ? 'calc(100vh - 60px)' : '100vh' }}>
-            {/* Categories */}
-            <div style={{ 
-                padding: '15px', backgroundColor: 'white', borderBottom: '1px solid #ddd', 
-                display: 'flex', gap: '10px', overflowX: 'auto', whiteSpace: 'nowrap',
-                WebkitOverflowScrolling: 'touch' 
-            }}>
-                <button 
-                    onClick={() => setActiveCategory('All')}
-                    style={{ 
-                        padding: '8px 16px', borderRadius: '20px', border: '1px solid #ddd',
-                        backgroundColor: activeCategory === 'All' ? 'black' : 'white',
-                        color: activeCategory === 'All' ? 'white' : 'black',
-                        cursor: 'pointer', flexShrink: 0
-                    }}
-                >
-                    All Items ({items.length})
-                </button>
-                {categories.map(cat => (
-                     <button 
-                        key={cat.id} 
-                        onClick={() => setActiveCategory(cat.id)}
-                        style={{ 
-                            padding: '8px 16px', borderRadius: '20px', border: '1px solid #ddd',
-                            backgroundColor: activeCategory === cat.id ? 'black' : 'white',
-                            color: activeCategory === cat.id ? 'white' : 'black',
-                            cursor: 'pointer', flexShrink: 0
-                        }}
-                    >
-                        {cat.name} ({getCount(cat)})
-                    </button>
+            {/* CRITICAL: Display Combo Contents on Menu Card */}
+            {item.isCombo && item.comboItems && (
+              <div style={{ margin: '8px 0', padding: '8px', backgroundColor: '#f9f9f9', borderRadius: '6px', textAlign: 'left' }}>
+                {item.comboItems.map((sub, i) => (
+                  <div key={i} style={{ fontSize: '0.7rem', color: '#666', lineHeight: '1.4' }}>
+                    • {sub.qty}x {sub.name}
+                  </div>
                 ))}
-            </div>
+              </div>
+            )}
 
-            {/* Items */}
-            <div style={{ 
-                flex: 1, padding: '15px', overflowY: 'auto', 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', 
-                gap: '15px', alignContent: 'start'
-            }}>
-                {filteredItems.map(item => (
-                    <div 
-                        key={item.id} 
-                        onClick={() => handleItemClick(item)}
-                        style={{ 
-                            backgroundColor: 'white', borderRadius: '12px', padding: '15px', 
-                            textAlign: 'center', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', 
-                            cursor: 'pointer', border: '1px solid #eee',
-                            display: 'flex', flexDirection: 'column', justifyContent: 'center',
-                            minHeight: '100px'
-                        }}
-                    >
-                        <h4 style={{ margin: '0 0 5px 0', fontSize: '1rem', color: '#000000' }}>{item.name}</h4>
-                        <div style={{ fontWeight: 'bold', color: '#4CAF50', marginTop: 'auto' }}>Rs. {item.price}</div>
-                    </div>
-                ))}
-                
-                {filteredItems.length === 0 && (
-                    <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#888', padding: '20px' }}>
-                        No items found in this category.
-                    </div>
-                )}
+            <div style={{ fontWeight: 'bold', color: '#4CAF50', marginTop: 'auto' }}>
+              Rs. {item.price}
             </div>
-        </div>
-    );
+          </div>
+        ))}
+        
+        {filteredItems.length === 0 && (
+          <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#888', padding: '20px' }}>
+            No items found in this category.
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
 
-// --- DROPDOWN SIDEBAR ---
+// ==========================================
+// 3. SIDEBAR COMPONENT
+// ==========================================
 const SidebarView = ({ navigate, isMobile }) => {
-    const [openSection, setOpenSection] = useState(null);
+  const [openSection, setOpenSection] = useState(null);
+  const toggleSection = (sectionName) => setOpenSection(openSection === sectionName ? null : sectionName);
 
-    const toggleSection = (sectionName) => {
-        setOpenSection(openSection === sectionName ? null : sectionName);
-    };
+  const menuOptions = [
+    { title: "1. Menu", icon: "🍔", subItems: [{ label: "a. Dishes", path: "/admin-menu" }, { label: "b. Category", path: "/admin-category" }, { label: "c. Combo Offer", path: "/admin-combos" }, { label: "d. Add On & Extras", path: "/admin-addons" }] },
+    { title: "2. Finance", icon: "💰", subItems: [{ label: "a. Daybook", path: "/finance-daybook" }, { label: "b. Transactions", path: "/finance-transactions" }, { label: "c. Sales & Purchases", path: "/finance-sales" }, { label: "d. Income & Expenses", path: "/finance-income" }] },
+    { title: "3. Inventory", icon: "📦", subItems: [{ label: "a. Stock Items", path: "/inventory-stock" }, { label: "b. Consumption", path: "/inventory-consumption" }, { label: "c. Suppliers", path: "/inventory-suppliers" }] }
+  ];
 
-    const menuOptions = [
-        { title: "1. Menu", icon: "🍔", subItems: [{ label: "a. Dishes", path: "/admin-menu" }, { label: "b. Category", path: "/admin-category" }, { label: "c. Combo Offer", path: "/admin-combos" }, { label: "d. Add On & Extras", path: "/admin-addons" }] },
-        { title: "2. Finance", icon: "💰", subItems: [{ label: "a. Daybook", path: "/finance-daybook" }, { label: "b. Transactions", path: "/finance-transactions" }, { label: "c. Sales & Purchases", path: "/finance-sales" }, { label: "d. Income & Expenses", path: "/finance-income" }] },
-        { title: "3. Inventory", icon: "📦", subItems: [{ label: "a. Stock Items", path: "/inventory-stock" }, { label: "b. Consumption", path: "/inventory-consumption" }, { label: "c. Suppliers", path: "/inventory-suppliers" }] }
-    ];
-
-    return (
-        <div style={{ width: isMobile ? '100%' : '220px', height: isMobile ? 'calc(100vh - 60px)' : '100vh', backgroundColor: '#f8f9fa', borderLeft: isMobile ? 'none' : '1px solid #ddd', padding: '15px', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-            <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', color: '#333', textTransform: 'uppercase', borderBottom:'1px solid #eee', paddingBottom:'10px' }}>Options</h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
-                <button onClick={() => navigate('/tables')} style={{...sidebarBtn, backgroundColor: '#e3f2fd', border: '1px solid #90caf9'}}>🪑 Table Management</button>
-                {menuOptions.map((section) => (
-                    <div key={section.title} style={{ marginBottom: '5px' }}>
-                        <button onClick={() => toggleSection(section.title)} style={{ ...sidebarBtn, display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: openSection === section.title ? '#333' : 'white', color: openSection === section.title ? 'white' : 'black' }}>
-                            <span>{section.icon} {section.title}</span><span>{openSection === section.title ? '▲' : '▼'}</span>
-                        </button>
-                        {openSection === section.title && (
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', padding: '10px 0 10px 15px', backgroundColor: '#f1f1f1', borderRadius: '0 0 8px 8px' }}>
-                                {section.subItems.map((item) => (
-                                    <button key={item.label} onClick={() => navigate(item.path)} style={{ ...sidebarBtn, backgroundColor: 'transparent', boxShadow: 'none', fontSize: '0.85rem', padding: '8px', color: '#555' }}>{item.label}</button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
+  return (
+    <div style={{ width: isMobile ? '100%' : '220px', height: isMobile ? 'calc(100vh - 60px)' : '100vh', backgroundColor: '#f8f9fa', borderLeft: isMobile ? 'none' : '1px solid #ddd', padding: '15px', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
+      <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', color: '#333', textTransform: 'uppercase', borderBottom:'1px solid #eee', paddingBottom:'10px' }}>Options</h3>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+        <button onClick={() => navigate('/tables')} style={{...sidebarBtn, backgroundColor: '#e3f2fd', border: '1px solid #90caf9'}}>🪑 Table Management</button>
+        {menuOptions.map((section) => (
+          <div key={section.title} style={{ marginBottom: '5px' }}>
+            <button onClick={() => toggleSection(section.title)} style={{ ...sidebarBtn, display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: openSection === section.title ? '#333' : 'white', color: openSection === section.title ? 'white' : 'black' }}>
+              <span>{section.icon} {section.title}</span><span>{openSection === section.title ? '▲' : '▼'}</span>
+            </button>
+            {openSection === section.title && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', padding: '10px 0 10px 15px', backgroundColor: '#f1f1f1', borderRadius: '0 0 8px 8px' }}>
+                {section.subItems.map((item) => (
+                  <button key={item.label} onClick={() => navigate(item.path)} style={{ ...sidebarBtn, backgroundColor: 'transparent', boxShadow: 'none', fontSize: '0.85rem', padding: '8px', color: '#555' }}>{item.label}</button>
                 ))}
-            </div>
-            <button onClick={() => navigate('/')} style={{ ...sidebarBtn, marginTop: '20px', backgroundColor: '#d32f2f', color: 'white' }}>← Dashboard</button>
-        </div>
-    );
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+      <button onClick={() => navigate('/')} style={{ ...sidebarBtn, marginTop: '20px', backgroundColor: '#d32f2f', color: 'white' }}>← Dashboard</button>
+    </div>
+  );
 };
 
-// --- MAIN COMPONENT ---
+// ==========================================
+// 4. MAIN MENUBOARD COMPONENT
+// ==========================================
 
 const MenuBoard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { tableId: initialTableId, tableName: initialTableName } = location.state || { tableId: 'Walk-in', tableName: 'Walk-in' };
 
-  // --- STATE ---
+  // State
   const [categories, setCategories] = useState([]);
   const [items, setItems] = useState([]);
   const [modifiers, setModifiers] = useState([]); 
+  const [combos, setCombos] = useState([]); 
   const [activeCategory, setActiveCategory] = useState('All');
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Tables State
+  // Tables & UI State
   const [tables, setTables] = useState([]);
   const [showTableSelector, setShowTableSelector] = useState(false);
-
-  // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null); 
   const [selectedExtras, setSelectedExtras] = useState([]); 
-
-  // --- UI STATE FOR MOBILE ---
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [mobileTab, setMobileTab] = useState('menu'); 
 
-  // --- DATA FETCHING ---
+  // --- DATA LOADING ---
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
     window.addEventListener('resize', handleResize);
@@ -239,10 +295,12 @@ const MenuBoard = () => {
         const catSnap = await getDocs(collection(db, "categories"));
         const itemSnap = await getDocs(collection(db, "menu_items"));
         const modSnap = await getDocs(collection(db, "modifiers"));
+        const comboSnap = await getDocs(collection(db, "combos")); 
 
         setCategories(catSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (a.sortOrder || 0) - (b.sortOrder || 0)));
         setItems(itemSnap.docs.map(d => ({id: d.id, ...d.data()})));
         setModifiers(modSnap.docs.map(d => ({id: d.id, ...d.data()})));
+        setCombos(comboSnap.docs.map(d => ({id: d.id, ...d.data()}))); 
         setLoading(false);
       } catch (error) {
         console.error("Error:", error);
@@ -250,6 +308,7 @@ const MenuBoard = () => {
     };
     fetchData();
 
+    // Real-time table listener
     const unsubTables = onSnapshot(collection(db, "tables"), (snapshot) => {
         setTables(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => {
             const numA = parseInt(a.name.replace(/^\D+/g, '')) || 0;
@@ -264,7 +323,63 @@ const MenuBoard = () => {
     };
   }, []);
 
-  // --- HANDLERS ---
+  // --- COMBO LOGIC ---
+  
+  // 1. Detect if cart contains ingredients for a combo
+  const checkAvailableCombos = () => {
+      if (combos.length === 0 || cart.length === 0) return [];
+      const detected = [];
+
+      combos.forEach(combo => {
+          if (!combo.itemIds || combo.itemIds.length === 0) return;
+          if (!combo.isAvailable) return;
+
+          // Simple Check: Does cart have ALL required Item IDs?
+          const cartIds = cart.map(c => c.id);
+          const hasAllIngredients = combo.itemIds.every(reqId => cartIds.includes(reqId));
+
+          if (hasAllIngredients) {
+              detected.push(combo);
+          }
+      });
+      return detected;
+  };
+
+  // 2. Apply Combo (Remove ingredients, Add Combo Item)
+  const applyCombo = (combo) => {
+      let newCart = [...cart];
+      
+      // Remove ingredients
+      combo.itemIds.forEach(reqId => {
+          const index = newCart.findIndex(item => item.id === reqId && !item.isCombo); 
+          if (index !== -1) {
+              if (newCart[index].qty > 1) {
+                  newCart[index].qty -= 1;
+              } else {
+                  newCart.splice(index, 1);
+              }
+          }
+      });
+
+      // Add Combo Item
+      const comboItem = {
+          id: combo.id, 
+          name: combo.name,
+          price: parseFloat(combo.price),
+          qty: 1,
+          isCombo: true, 
+          comboItems: combo.comboItems || [], // Store the breakdown
+          cartId: Math.random().toString(36).substr(2, 9)
+      };
+
+      newCart.push(comboItem);
+      setCart(newCart);
+      alert(`${combo.name} Applied!`);
+  };
+
+  const detectedCombos = checkAvailableCombos();
+
+  // --- CART HANDLERS ---
   const handleItemClick = (item) => {
     setSelectedItem(item);
     setSelectedExtras([]); 
@@ -346,7 +461,7 @@ const MenuBoard = () => {
     try {
       const totalAmount = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
       await addDoc(collection(db, "orders"), {
-        items: cart,
+        items: cart, // This now includes comboItems array if it's a combo
         totalAmount,
         status: "PENDING",
         createdAt: serverTimestamp(),
@@ -367,22 +482,47 @@ const MenuBoard = () => {
   return (
     <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', height: '100vh', backgroundColor: '#f5f5f5', overflow: 'hidden', fontFamily: 'Arial, sans-serif' }}>
       
+      {/* DESKTOP VIEW */}
       {!isMobile && (
           <>
-            <CartView cart={cart} initialTableName={initialTableName} initialTableId={initialTableId} handleSendClick={handleSendClick} updateQty={handleUpdateQty} removeItem={handleRemoveItem} isMobile={false} />
+            <CartView 
+                cart={cart} 
+                initialTableName={initialTableName} 
+                initialTableId={initialTableId} 
+                handleSendClick={handleSendClick} 
+                updateQty={handleUpdateQty} 
+                removeItem={handleRemoveItem} 
+                isMobile={false} 
+                detectedCombos={detectedCombos} 
+                applyCombo={applyCombo} 
+            />
             <MenuView categories={categories} activeCategory={activeCategory} setActiveCategory={setActiveCategory} items={items} handleItemClick={handleItemClick} isMobile={false} />
             <SidebarView navigate={navigate} isMobile={false} />
           </>
       )}
 
+      {/* MOBILE VIEW */}
       {isMobile && (
           <div style={{ flex: 1, overflow: 'hidden' }}>
               {mobileTab === 'menu' && <MenuView categories={categories} activeCategory={activeCategory} setActiveCategory={setActiveCategory} items={items} handleItemClick={handleItemClick} isMobile={true} />}
-              {mobileTab === 'cart' && <CartView cart={cart} initialTableName={initialTableName} initialTableId={initialTableId} handleSendClick={handleSendClick} updateQty={handleUpdateQty} removeItem={handleRemoveItem} isMobile={true} />}
+              {mobileTab === 'cart' && (
+                <CartView 
+                    cart={cart} 
+                    initialTableName={initialTableName} 
+                    initialTableId={initialTableId} 
+                    handleSendClick={handleSendClick} 
+                    updateQty={handleUpdateQty} 
+                    removeItem={handleRemoveItem} 
+                    isMobile={true} 
+                    detectedCombos={detectedCombos} 
+                    applyCombo={applyCombo}
+                />
+              )}
               {mobileTab === 'options' && <SidebarView navigate={navigate} isMobile={true} />}
           </div>
       )}
 
+      {/* MOBILE BOTTOM NAV */}
       {isMobile && (
           <div style={{ height: '60px', backgroundColor: 'white', borderTop: '1px solid #ddd', display: 'flex', justifyContent: 'space-around', alignItems: 'center', position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000 }}>
               <button onClick={() => setMobileTab('menu')} style={{ ...mobileNavBtn, color: mobileTab === 'menu' ? 'black' : '#888' }}><span>🍔</span><span style={{fontSize:'0.7rem'}}>Menu</span></button>
@@ -391,11 +531,21 @@ const MenuBoard = () => {
           </div>
       )}
 
+      {/* MODAL: ITEM DETAILS */}
       {isModalOpen && selectedItem && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000 }}>
           <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '12px', width: '90%', maxWidth: '400px', color: '#000000' }}>
             <h2 style={{ marginTop: 0, color: '#000000' }}>{selectedItem.name}</h2>
             <p style={{color: '#666'}}>Base Price: ${selectedItem.price.toFixed(2)}</p>
+            
+            {/* Show contents in modal if combo */}
+            {selectedItem.isCombo && selectedItem.comboItems && (
+                <div style={{background:'#f9f9f9', padding:10, borderRadius:6, marginBottom:10}}>
+                    <strong style={{fontSize:'0.8rem'}}>Includes:</strong>
+                    {selectedItem.comboItems.map((c,i)=>(<div key={i} style={{fontSize:'0.8rem'}}>• {c.name}</div>))}
+                </div>
+            )}
+
             <h4 style={{ marginBottom: '10px', color: '#000000' }}>Extras:</h4>
             <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #eee', padding: '10px', borderRadius: '8px', marginBottom: '20px' }}>
                 {modifiers.map(mod => (
@@ -412,6 +562,7 @@ const MenuBoard = () => {
         </div>
       )}
 
+      {/* MODAL: TABLE SELECTOR */}
       {showTableSelector && (
         <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.9)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 3000 }}>
             <div style={{ backgroundColor: 'white', borderRadius: isMobile ? '0' : '12px', width: isMobile ? '100%' : '600px', height: isMobile ? '100%' : 'auto', maxHeight: isMobile ? '100%' : '90vh', maxWidth: '100%', padding: '20px', display:'flex', flexDirection:'column' }}>
@@ -432,7 +583,12 @@ const MenuBoard = () => {
   );
 };
 
+// ==========================================
+// 5. STYLES (Helpers)
+// ==========================================
 const sidebarBtn = { padding: '15px', border: 'none', backgroundColor: 'white', color: '#000000', textAlign: 'left', borderRadius: '8px', cursor: 'pointer', fontSize: '0.9rem', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' };
 const mobileNavBtn = { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, padding: '10px' };
+const qtyBtnStyle = { width:'25px', height:'25px', borderRadius:'50%', border:'1px solid #ddd', background:'white', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' };
+const catBtnStyle = { padding: '8px 16px', borderRadius: '20px', border: '1px solid #ddd', cursor: 'pointer', flexShrink: 0 };
 
 export default MenuBoard;
