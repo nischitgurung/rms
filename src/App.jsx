@@ -18,6 +18,8 @@ import AdminCombos from './components/AdminCombos';
 import Transactions from './components/Transactions';
 import SalesPurchases from './components/SalesPurchases';
 import IncomeExpenses from './components/IncomeExpenses';
+import Consumption from './components/Consumption'; // FIX: Imported as Consumption matches filename
+
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -68,19 +70,20 @@ function App() {
         </ProtectedRoute>
       } />
 
-      {/* UPDATED: Matches sidebar link "/admin-addons" */}
+      {/* Matches sidebar link "/admin-addons" */}
       <Route path="/admin-addons" element={
         <ProtectedRoute>
           <AddonManager />
         </ProtectedRoute>
       } />
 
-      {/* Placeholder for Combos (matches sidebar to prevent 404) */}
-     <Route path="/admin-combos" element={
-  <ProtectedRoute>
-    <AdminCombos />
-  </ProtectedRoute>
-} />
+      {/* Matches sidebar link "/admin-combos" */}
+      <Route path="/admin-combos" element={
+        <ProtectedRoute>
+          <AdminCombos />
+        </ProtectedRoute>
+      } />
+
       {/* --- TABLES & ORDERS --- */}
       <Route path="/tables" element={
         <ProtectedRoute>
@@ -95,7 +98,6 @@ function App() {
       } />
 
       {/* --- INVENTORY --- */}
-      {/* UPDATED: Matches sidebar "/inventory-stock" */}
       <Route path="/inventory-stock" element={
         <ProtectedRoute>
           <Inventory />
@@ -103,21 +105,42 @@ function App() {
       } />
       
       {/* Route other inventory links to main Inventory for now */}
-      <Route path="/inventory-consumption" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
-      <Route path="/inventory-suppliers" element={<ProtectedRoute><Inventory /></ProtectedRoute>} />
+      <Route path="/inventory-consumption" element={
+        <ProtectedRoute>
+            <Consumption />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/inventory-suppliers" element={
+        <ProtectedRoute>
+            <Inventory />
+        </ProtectedRoute>
+      } />
 
       {/* --- FINANCE --- */}
-      {/* UPDATED: Matches sidebar "/finance-daybook" */}
       <Route path="/finance-daybook" element={
         <ProtectedRoute>
           <DayBook />
         </ProtectedRoute>
       } />
 
-      {/* Route other finance links to DayBook for now */}
-      <Route path="/finance-transactions" element={<ProtectedRoute><Transactions /></ProtectedRoute>} />
-      <Route path="/finance-sales" element={<ProtectedRoute><SalesPurchases /></ProtectedRoute>} />
-      <Route path="/finance-income" element={<ProtectedRoute><IncomeExpenses /></ProtectedRoute>} />
+      <Route path="/finance-transactions" element={
+        <ProtectedRoute>
+            <Transactions />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/finance-sales" element={
+        <ProtectedRoute>
+            <SalesPurchases />
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/finance-income" element={
+        <ProtectedRoute>
+            <IncomeExpenses />
+        </ProtectedRoute>
+      } />
 
     </Routes>
   );
