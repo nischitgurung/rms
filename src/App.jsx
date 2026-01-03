@@ -19,6 +19,7 @@ import Transactions from './components/Transactions';
 import SalesPurchases from './components/SalesPurchases';
 import IncomeExpenses from './components/IncomeExpenses';
 import Consumption from './components/Consumption'; // FIX: Imported as Consumption matches filename
+import Suppliers from './components/Suppliers';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -113,7 +114,7 @@ function App() {
       
       <Route path="/inventory-suppliers" element={
         <ProtectedRoute>
-            <Inventory />
+            <Suppliers />
         </ProtectedRoute>
       } />
 
