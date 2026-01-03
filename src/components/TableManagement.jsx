@@ -9,13 +9,13 @@ const TableManagement = () => {
   
   // --- STATE ---
   const [tables, setTables] = useState([]);
-  const [activeOrders, setActiveOrders] = useState([]); // Stores ALL active orders for the dashboard
+  const [activeOrders, setActiveOrders] = useState([]); 
   const [loading, setLoading] = useState(true);
   
   // Modal & View State
   const [selectedTable, setSelectedTable] = useState(null); 
   const [viewMode, setViewMode] = useState('ACTIONS'); 
-  const [currentTableOrders, setCurrentTableOrders] = useState([]); // Orders for the SPECIFIC selected table
+  const [currentTableOrders, setCurrentTableOrders] = useState([]); 
   const [grandTotal, setGrandTotal] = useState(0);
   
   // Payment State
@@ -58,7 +58,6 @@ const TableManagement = () => {
     });
 
     // B. Active Orders Listener (To show status on cards)
-    // We want orders that are NOT paid.
     const qOrders = query(collection(db, "orders"), where("status", "!=", "PAID"));
     const unsubOrders = onSnapshot(qOrders, (snapshot) => {
         const ordersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -74,13 +73,12 @@ const TableManagement = () => {
 
   // --- HELPER: GET STATUS FOR SPECIFIC TABLE ---
   const getTableKitchenStatus = (tableName) => {
-      // Find the most recent active order for this table
       const tableOrder = activeOrders
         .filter(o => o.tableId === tableName)
         .sort((a,b) => b.createdAt - a.createdAt)[0];
 
       if (!tableOrder) return null;
-      return tableOrder.status; // PENDING, PREPARING, READY, COMPLETED
+      return tableOrder.status; 
   };
 
   // --- HANDLE CLICKING A TABLE ---
@@ -265,7 +263,6 @@ const TableManagement = () => {
                     {/* ACTIONS VIEW */}
                     {viewMode === 'ACTIONS' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            {/* If there are orders, show a summary here */}
                             {currentTableOrders.length > 0 && (
                                 <div style={{background:'#fafafa', padding:'10px', borderRadius:'6px', marginBottom:'10px', border:'1px dashed #ccc'}}>
                                     <div style={{fontSize:'0.9rem', color:'#666'}}>Current Bill:</div>
@@ -320,10 +317,29 @@ const TableManagement = () => {
                                                                 {order.status}
                                                             </span>
                                                          </div>
+                                                         
                                                          {order.items.map((item, i) => (
-                                                             <div key={i} style={{display:'flex', justifyContent:'space-between', fontSize: '0.9rem'}}>
-                                                                 <span>{item.qty}x {item.name}</span>
-                                                                 <span>Rs. {(item.price * item.qty).toFixed(2)}</span>
+                                                             <div key={i} style={{marginBottom:'5px'}}>
+                                                                 {/* Main Item Row */}
+                                                                 <div style={{display:'flex', justifyContent:'space-between', fontSize: '0.9rem'}}>
+                                                                     <span>{item.qty}x {item.name}</span>
+                                                                     <span>Rs. {(item.price * item.qty).toFixed(2)}</span>
+                                                                 </div>
+
+                                                                 {/* --- FIX: COMBO CONTENT DISPLAY IN BILL --- */}
+                                                                 {item.isCombo && item.comboItems && (
+                                                                     <div style={{ 
+                                                                         fontSize: '0.75rem', 
+                                                                         color: '#666', 
+                                                                         paddingLeft: '12px', 
+                                                                         marginTop: '2px',
+                                                                         borderLeft: '2px solid #ddd'
+                                                                     }}>
+                                                                         {item.comboItems.map((sub, sIdx) => (
+                                                                             <div key={sIdx}>• {sub.qty}x {sub.name}</div>
+                                                                         ))}
+                                                                     </div>
+                                                                 )}
                                                              </div>
                                                          ))}
                                                      </div>

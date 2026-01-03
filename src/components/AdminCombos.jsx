@@ -8,8 +8,7 @@ const AdminCombos = () => {
   
   // --- STATE ---
   const [combos, setCombos] = useState([]);
-  const [menuItems, setMenuItems] = useState([]); // Needed to select items for a combo
-  const [orders, setOrders] = useState([]); 
+  const [menuItems, setMenuItems] = useState([]); 
   const [loading, setLoading] = useState(true);
   
   const [showForm, setShowForm] = useState(false);
@@ -27,7 +26,7 @@ const AdminCombos = () => {
     name: '', 
     price: '', 
     description: '', 
-    itemIds: [], // Array of Dish IDs included in this combo
+    comboItems: [], // CHANGED: Array of objects { id, name, qty }
     isAvailable: true
   });
 
@@ -38,7 +37,7 @@ const AdminCombos = () => {
 
     const fetchData = async () => {
         try {
-            // A. Fetch Combos (Real-time listener)
+            // A. Fetch Combos
             const unsubCombos = onSnapshot(collection(db, "combos"), (snapshot) => {
                 const fetchedCombos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 setCombos(fetchedCombos);
@@ -46,7 +45,7 @@ const AdminCombos = () => {
                 setLoading(false);
             });
 
-            // B. Fetch Menu Items (To populate the selection list)
+            // B. Fetch Menu Items
             const itemSnap = await getDocs(collection(db, "menu_items"));
             const fetchedItems = itemSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setMenuItems(fetchedItems);
@@ -62,35 +61,93 @@ const AdminCombos = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // --- 2. CALCULATE STATS ---
+  // --- 2. STATS ---
   const calculateStats = (data) => {
       const total = data.length;
       const active = data.filter(c => c.isAvailable).length;
       const totalPrices = data.reduce((acc, curr) => acc + (parseFloat(curr.price) || 0), 0);
       const avgPrice = total > 0 ? Math.round(totalPrices / total) : 0;
-
       setStats({ total, active, avgPrice });
   };
 
-  // --- 3. HELPER: Get Names of Items in Combo ---
-  const getContentNames = (itemIds) => {
-      if (!itemIds || itemIds.length === 0) return "No items";
-      // Map IDs to Names
-      const names = itemIds.map(id => {
-          const item = menuItems.find(i => i.id === id);
-          return item ? item.name : null;
-      }).filter(n => n); // Remove nulls
+  // --- 3. HELPER: Display contents nicely in the table ---
+  const getContentsDisplay = (comboItems) => {
+      if (!comboItems || comboItems.length === 0) return "No items";
+      // If it's the old format (array of strings), handle gracefully
+      if (typeof comboItems[0] === 'string') return "Legacy Format (Edit to fix)";
       
-      return names.join(', ');
+      return comboItems.map(i => `${i.qty}x ${i.name}`).join(', ');
   };
 
-  // --- 4. FORM HANDLERS ---
+  // --- 4. FORM LOGIC (QUANTITY HANDLING) ---
+
+  // Add item or Increase Quantity
+  const handleAddItem = (item) => {
+      setFormData(prev => {
+          const existing = prev.comboItems.find(i => i.id === item.id);
+          let newItems;
+          
+          if (existing) {
+              // Increment Qty
+              newItems = prev.comboItems.map(i => 
+                  i.id === item.id ? { ...i, qty: i.qty + 1 } : i
+              );
+          } else {
+              // Add New
+              newItems = [...prev.comboItems, { id: item.id, name: item.name, qty: 1 }];
+          }
+          return { ...prev, comboItems: newItems };
+      });
+  };
+
+  // Decrease Quantity or Remove
+  const handleDecreaseItem = (itemId) => {
+      setFormData(prev => {
+          const existing = prev.comboItems.find(i => i.id === itemId);
+          if (!existing) return prev;
+
+          let newItems;
+          if (existing.qty > 1) {
+              // Decrease Qty
+              newItems = prev.comboItems.map(i => 
+                  i.id === itemId ? { ...i, qty: i.qty - 1 } : i
+              );
+          } else {
+              // Remove completely
+              newItems = prev.comboItems.filter(i => i.id !== itemId);
+          }
+          return { ...prev, comboItems: newItems };
+      });
+  };
+
+  const handleRemoveItemCompletely = (itemId) => {
+      setFormData(prev => ({
+          ...prev,
+          comboItems: prev.comboItems.filter(i => i.id !== itemId)
+      }));
+  };
+
+  // --- 5. CRUD ACTIONS ---
   const handleEditClick = (combo) => {
+      // Compatibility check: If modifying an old combo that only had itemIds
+      let formattedItems = [];
+      if (combo.comboItems) {
+          formattedItems = combo.comboItems;
+      } else if (combo.itemIds) {
+          // Attempt to convert old simple array to new qty array
+          const counts = {};
+          combo.itemIds.forEach(id => { counts[id] = (counts[id] || 0) + 1; });
+          formattedItems = Object.keys(counts).map(id => {
+              const mi = menuItems.find(m => m.id === id);
+              return { id: id, name: mi ? mi.name : 'Unknown', qty: counts[id] };
+          });
+      }
+
       setFormData({
           name: combo.name,
           price: combo.price,
           description: combo.description || '',
-          itemIds: combo.itemIds || [],
+          comboItems: formattedItems,
           isAvailable: combo.isAvailable
       });
       setEditingId(combo.id);
@@ -98,25 +155,24 @@ const AdminCombos = () => {
       window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
 
-  const handleItemToggle = (itemId) => {
-      setFormData(prev => {
-          const exists = prev.itemIds.includes(itemId);
-          if (exists) {
-              return { ...prev, itemIds: prev.itemIds.filter(id => id !== itemId) };
-          } else {
-              return { ...prev, itemIds: [...prev.itemIds, itemId] };
-          }
-      });
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.price) return alert("Name and Price are required!");
-    if (formData.itemIds.length === 0) return alert("Please select at least one item for the combo.");
+    if (formData.comboItems.length === 0) return alert("Please select items.");
 
     try {
+        // We save 'comboItems' for the quantity breakdown
+        // We also save 'itemIds' (flat array) if you ever need to search "Which combos have pepsi?" easily
+        const flatIds = [];
+        formData.comboItems.forEach(item => {
+             // push ID as many times as qty if you want, or just once. 
+             // Usually just once is enough for searching, but let's do once per ID.
+             flatIds.push(item.id);
+        });
+
         const payload = {
             ...formData,
+            itemIds: flatIds, // Searchable IDs
             price: parseFloat(formData.price),
             createdAt: editingId ? formData.createdAt : serverTimestamp() 
         };
@@ -129,7 +185,7 @@ const AdminCombos = () => {
             alert("Combo Created!");
         }
 
-        setFormData({ name: '', price: '', description: '', itemIds: [], isAvailable: true });
+        setFormData({ name: '', price: '', description: '', comboItems: [], isAvailable: true });
         setEditingId(null);
         setShowForm(false);
 
@@ -145,7 +201,7 @@ const AdminCombos = () => {
     }
   };
 
-  // --- 5. FILTER LOGIC ---
+  // --- 6. RENDER ---
   const filteredCombos = combos.filter(c => c.name.toLowerCase().includes(filterText.toLowerCase()));
 
   if (loading) return <div style={{padding:'40px'}}>Loading Combos...</div>;
@@ -163,7 +219,7 @@ const AdminCombos = () => {
         <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto' }}>
             <button onClick={() => navigate('/')} style={{ flex: isMobile ? 1 : 'none', padding: '10px 20px', border: '1px solid #ccc', background: 'white', borderRadius: '6px', cursor: 'pointer' }}>Back</button>
             <button 
-              onClick={() => { setShowForm(!showForm); setEditingId(null); setFormData({ name: '', price: '', description: '', itemIds: [], isAvailable: true }); }} 
+              onClick={() => { setShowForm(!showForm); setEditingId(null); setFormData({ name: '', price: '', description: '', comboItems: [], isAvailable: true }); }} 
               style={{ flex: isMobile ? 2 : 'none', padding: '10px 20px', backgroundColor: 'black', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}
             >
               {showForm ? "Close Form" : "+ Add Combo"}
@@ -220,22 +276,54 @@ const AdminCombos = () => {
                 <input type="text" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} style={styles.input} placeholder="Short description..." />
             </div>
 
-            {/* ITEM SELECTION (CHECKLIST) */}
-            <div>
-                <label style={styles.label}>Includes Items ({formData.itemIds.length} selected):</label>
-                <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #ddd', borderRadius: '6px', padding: '10px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '10px', backgroundColor:'#fafafa' }}>
-                    {menuItems.map(item => (
-                        <label key={item.id} style={{ display: 'flex', alignItems: 'center', fontSize: '0.9rem', cursor: 'pointer' }}>
-                            <input 
-                                type="checkbox" 
-                                checked={formData.itemIds.includes(item.id)}
-                                onChange={() => handleItemToggle(item.id)}
-                                style={{ marginRight: '8px' }}
-                            />
-                            {item.name}
-                        </label>
-                    ))}
+            {/* --- UPDATED: ITEM SELECTION WITH QUANTITY --- */}
+            <div style={{display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '20px', marginTop:'10px'}}>
+                
+                {/* LEFT: AVAILABLE ITEMS */}
+                <div style={{flex: 1}}>
+                    <label style={styles.label}>Available Items (Click to Add)</label>
+                    <div style={{ maxHeight: '250px', overflowY: 'auto', border: '1px solid #ddd', borderRadius: '6px', backgroundColor:'#fafafa' }}>
+                        {menuItems.map(item => (
+                            <div 
+                                key={item.id} 
+                                onClick={() => handleAddItem(item)}
+                                style={{ 
+                                    padding: '10px', borderBottom: '1px solid #eee', cursor: 'pointer', 
+                                    display:'flex', justifyContent:'space-between',
+                                    backgroundColor: 'white'
+                                }}
+                                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#f0f0f0'}
+                                onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                            >
+                                <span>{item.name}</span>
+                                <span style={{fontSize:'0.8rem', color:'#4CAF50'}}>+ Add</span>
+                            </div>
+                        ))}
+                    </div>
                 </div>
+
+                {/* RIGHT: SELECTED ITEMS (WITH COUNTER) */}
+                <div style={{flex: 1}}>
+                    <label style={styles.label}>Selected Contents ({formData.comboItems.reduce((acc, i) => acc + i.qty, 0)} items)</label>
+                    <div style={{ minHeight:'100px', maxHeight: '250px', overflowY: 'auto', border: '2px dashed #ccc', borderRadius: '6px', padding:'10px', backgroundColor:'#fff' }}>
+                        
+                        {formData.comboItems.length === 0 && <div style={{color:'#999', textAlign:'center', marginTop:'20px'}}>No items selected</div>}
+
+                        {formData.comboItems.map((item, index) => (
+                            <div key={index} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px', borderBottom:'1px solid #eee', backgroundColor:'#E3F2FD', borderRadius:'4px', marginBottom:'5px' }}>
+                                <span style={{fontWeight:'bold', fontSize:'0.9rem'}}>{item.name}</span>
+                                
+                                <div style={{display:'flex', alignItems:'center', gap:'5px'}}>
+                                    <button type="button" onClick={() => handleDecreaseItem(item.id)} style={styles.qtyBtn}>-</button>
+                                    <span style={{fontWeight:'bold', width:'20px', textAlign:'center'}}>{item.qty}</span>
+                                    <button type="button" onClick={() => handleAddItem(item)} style={styles.qtyBtn}>+</button>
+                                    <button type="button" onClick={() => handleRemoveItemCompletely(item.id)} style={{...styles.qtyBtn, backgroundColor:'#FFEBEE', color:'red', marginLeft:'5px'}}>x</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
             </div>
 
             <div style={{display: 'flex', alignItems:'center', marginTop:'10px'}}>
@@ -262,7 +350,7 @@ const AdminCombos = () => {
                         <span style={{ fontWeight:'bold', color: '#4CAF50' }}>Rs. {combo.price}</span>
                     </div>
                     <div style={{ fontSize: '0.85rem', color: '#555', marginBottom: '10px', fontStyle: 'italic' }}>
-                        {getContentNames(combo.itemIds)}
+                        {getContentsDisplay(combo.comboItems)}
                     </div>
                     <div style={{display:'flex', gap:'10px'}}>
                         <button onClick={() => handleEditClick(combo)} style={{flex:1, padding:'8px', background:'#eee', border:'none', borderRadius:'4px', cursor:'pointer'}}>Edit</button>
@@ -290,7 +378,7 @@ const AdminCombos = () => {
                         <td style={styles.td}>{index + 1}</td>
                         <td style={styles.td}><span style={{fontWeight:'bold'}}>{combo.name}</span></td>
                         <td style={{...styles.td, fontSize: '0.85rem', color: '#666', maxWidth: '300px'}}>
-                            {getContentNames(combo.itemIds)}
+                            {getContentsDisplay(combo.comboItems)}
                         </td>
                         <td style={styles.td}>Rs. {combo.price}</td>
                         <td style={styles.td}>
@@ -319,7 +407,8 @@ const styles = {
     input: { width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '1rem', boxSizing: 'border-box' },
     label: { display: 'block', marginBottom: '5px', fontSize: '0.9rem', fontWeight: 'bold', color: '#555' },
     th: { padding: '15px', textAlign: 'left', fontSize: '0.9rem', color: '#666', fontWeight: 'bold' },
-    td: { padding: '15px', fontSize: '0.95rem', color: '#333' }
+    td: { padding: '15px', fontSize: '0.95rem', color: '#333' },
+    qtyBtn: { width:'25px', height:'25px', borderRadius:'50%', border:'none', backgroundColor:'white', cursor:'pointer', fontWeight:'bold', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 1px 2px rgba(0,0,0,0.2)' }
 };
 
 export default AdminCombos;

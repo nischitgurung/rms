@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { db } from '../firebase'; // Ensure this path is correct for your project
+import { db } from '../firebase'; 
 import { 
   collection, 
   getDocs, 
@@ -52,7 +52,7 @@ const CartView = ({
               onClick={() => applyCombo(combo)}
               style={{ padding: '5px 10px', backgroundColor: '#2E7D32', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '0.8rem' }}
             >
-              Apply Save
+              Apply Deal
             </button>
           </div>
         ))}
@@ -78,7 +78,7 @@ const CartView = ({
                 <div key={ex.id} style={{ fontSize: '0.8rem', color: '#666666' }}>+ {ex.name}</div>
               ))}
 
-              {/* CRITICAL: Show Items INSIDE the Combo for the Kitchen */}
+              {/* Show Items INSIDE the Combo */}
               {item.isCombo && item.comboItems && (
                 <div style={{ marginTop: '4px', paddingLeft: '8px', borderLeft: '2px solid #eee' }}>
                    {item.comboItems.map((subItem, idx) => (
@@ -128,7 +128,6 @@ const CartView = ({
 // ==========================================
 const MenuView = ({ categories, activeCategory, setActiveCategory, items, handleItemClick, isMobile }) => {
   
-  // Filter Logic
   const getFilteredItems = () => {
     if (activeCategory === 'All') return items;
     const currentCat = categories.find(c => c.id === activeCategory);
@@ -193,7 +192,6 @@ const MenuView = ({ categories, activeCategory, setActiveCategory, items, handle
               {item.isCombo && '🎁 '}{item.name}
             </h4>
 
-            {/* CRITICAL: Display Combo Contents on Menu Card */}
             {item.isCombo && item.comboItems && (
               <div style={{ margin: '8px 0', padding: '8px', backgroundColor: '#f9f9f9', borderRadius: '6px', textAlign: 'left' }}>
                 {item.comboItems.map((sub, i) => (
@@ -323,22 +321,43 @@ const MenuBoard = () => {
     };
   }, []);
 
-  // --- COMBO LOGIC ---
+  // --- COMBO LOGIC (FIXED) ---
   
-  // 1. Detect if cart contains ingredients for a combo
+  // 1. Detect if cart contains ingredients for a combo based on EXACT QUANTITY
   const checkAvailableCombos = () => {
       if (combos.length === 0 || cart.length === 0) return [];
       const detected = [];
 
+      // Create a map of Cart Items (ID -> Total Qty)
+      // Example: { 'pepsi_id': 1, 'burger_id': 3 }
+      const cartQtyMap = {};
+      cart.forEach(item => {
+        // If it's a combo item itself, ignore it for detection purposes
+        if(!item.isCombo) {
+            cartQtyMap[item.id] = (cartQtyMap[item.id] || 0) + item.qty;
+        }
+      });
+
       combos.forEach(combo => {
-          if (!combo.itemIds || combo.itemIds.length === 0) return;
+          // Skip inactive
           if (!combo.isAvailable) return;
 
-          // Simple Check: Does cart have ALL required Item IDs?
-          const cartIds = cart.map(c => c.id);
-          const hasAllIngredients = combo.itemIds.every(reqId => cartIds.includes(reqId));
+          // Note: We use 'comboItems' which has the Quantity info
+          // Example: combo.comboItems = [{id: 'pepsi_id', qty: 3}, {id: 'burger_id', qty: 1}]
+          const requiredItems = combo.comboItems || [];
+          if (requiredItems.length === 0) return;
 
-          if (hasAllIngredients) {
+          let match = true;
+          for (const req of requiredItems) {
+              const currentQtyInCart = cartQtyMap[req.id] || 0;
+              // CRITICAL FIX: Check if Cart Qty is LESS than Required Qty
+              if (currentQtyInCart < req.qty) {
+                  match = false;
+                  break; // Fail immediately if one ingredient is missing or insufficient
+              }
+          }
+
+          if (match) {
               detected.push(combo);
           }
       });
@@ -349,15 +368,31 @@ const MenuBoard = () => {
   const applyCombo = (combo) => {
       let newCart = [...cart];
       
-      // Remove ingredients
-      combo.itemIds.forEach(reqId => {
-          const index = newCart.findIndex(item => item.id === reqId && !item.isCombo); 
-          if (index !== -1) {
-              if (newCart[index].qty > 1) {
-                  newCart[index].qty -= 1;
-              } else {
-                  newCart.splice(index, 1);
+      const requiredItems = combo.comboItems || [];
+
+      // Loop through required items (e.g., 3 Pepsi)
+      requiredItems.forEach(req => {
+          let qtyToRemove = req.qty;
+
+          // Find items in cart matching this requirement
+          // We might have multiple cart entries for the same ID (unlikely but possible)
+          // or just one entry with qty=5
+          for (let i = 0; i < newCart.length; i++) {
+              if (newCart[i].id === req.id && !newCart[i].isCombo && qtyToRemove > 0) {
+                  
+                  if (newCart[i].qty > qtyToRemove) {
+                      // Case: Cart has 5, we need 3. Reduce cart to 2.
+                      newCart[i].qty -= qtyToRemove;
+                      qtyToRemove = 0;
+                  } else {
+                      // Case: Cart has 3, we need 3. Remove item.
+                      // OR Case: Cart has 2, we need 3. Remove item, look for next one.
+                      qtyToRemove -= newCart[i].qty;
+                      newCart.splice(i, 1);
+                      i--; // Adjust index since we spliced
+                  }
               }
+              if (qtyToRemove === 0) break; 
           }
       });
 
@@ -542,7 +577,7 @@ const MenuBoard = () => {
             {selectedItem.isCombo && selectedItem.comboItems && (
                 <div style={{background:'#f9f9f9', padding:10, borderRadius:6, marginBottom:10}}>
                     <strong style={{fontSize:'0.8rem'}}>Includes:</strong>
-                    {selectedItem.comboItems.map((c,i)=>(<div key={i} style={{fontSize:'0.8rem'}}>• {c.name}</div>))}
+                    {selectedItem.comboItems.map((c,i)=>(<div key={i} style={{fontSize:'0.8rem'}}>• {c.qty}x {c.name}</div>))}
                 </div>
             )}
 
