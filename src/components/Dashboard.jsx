@@ -52,10 +52,10 @@ const Dashboard = () => {
     { title: "Open POS", icon: icons.pos, path: "/pos" },
     { title: "Orders", icon: icons.orders, path: "/orders" },
     { title: "Tables", icon: icons.tables, path: "/tables" },
-    { title: "Inventory", icon: icons.inventory, path: "/inventory" },
+    { title: "Inventory", icon: icons.inventory, path: "/inventory-stock" },
     // Extra modules kept consistent with the black theme
     { title: "Menu Dishes", icon: icons.menu, path: "/admin-menu" },
-    { title: "Day Book", icon: icons.finance, path: "/finance" },
+    { title: "Day Book", icon: icons.finance, path: "/finance-daybook" },
   ];
 
   return (
