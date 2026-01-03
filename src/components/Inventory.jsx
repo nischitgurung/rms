@@ -2,13 +2,20 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import emailjs from '@emailjs/browser'; // 1. IMPORT EMAILJS
 
 const Inventory = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  // --- CONFIG ---
+  // REPLACE THESE WITH YOUR ACTUAL EMAILJS KEYS
+  const SERVICE_ID = "service_lt5byrp"; 
+  const TEMPLATE_ID = "template_oy39nmc";
+  const PUBLIC_KEY = "q6gnSNf0gppPaEkI3";
+
   // --- STATE ---
-  const [activeTab, setActiveTab] = useState('STOCK'); // 'STOCK' or 'SUPPLIERS'
+  const [activeTab, setActiveTab] = useState('STOCK');
   const [inventory, setInventory] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,7 +30,7 @@ const Inventory = () => {
     itemName: '', category: '', quantity: '', unit: 'kg', minStock: '', supplierId: ''
   });
   const [supplierForm, setSupplierForm] = useState({
-    name: '', contact: '', address: ''
+    name: '', contact: '', address: '', email: '' 
   });
 
   // --- 1. DATA FETCHING ---
@@ -31,14 +38,11 @@ const Inventory = () => {
     if (location.pathname.includes('suppliers')) setActiveTab('SUPPLIERS');
     else setActiveTab('STOCK');
 
-    // A. Fetch Inventory
     const unsubInventory = onSnapshot(collection(db, "inventory"), (snap) => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      // Sort alphabetically by Item Name
       setInventory(data.sort((a,b) => (a.itemName || "").localeCompare(b.itemName || "")));
     });
 
-    // B. Fetch Suppliers
     const unsubSuppliers = onSnapshot(collection(db, "suppliers"), (snap) => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setSuppliers(data);
@@ -48,7 +52,42 @@ const Inventory = () => {
     return () => { unsubInventory(); unsubSuppliers(); };
   }, [location]);
 
-  // --- 2. HANDLERS: STOCK ---
+  // --- 2. AUTOMATIC EMAIL LOGIC ---
+  const checkAndSendMail = (itemData) => {
+      const currentQty = parseFloat(itemData.quantity);
+      const minQty = parseFloat(itemData.minStock);
+
+      // Check if stock is low
+      if (currentQty <= minQty) {
+          // Find the supplier details
+          const supplier = suppliers.find(s => s.id === itemData.supplierId);
+
+          if (supplier && supplier.email) {
+              console.log("Stock Low! Sending email to:", supplier.email);
+
+              const templateParams = {
+                  to_email: supplier.email,
+                  vendor_name: supplier.name,
+                  item_name: itemData.itemName,
+                  current_qty: itemData.quantity,
+                  unit: itemData.unit
+              };
+
+              emailjs.send(SERVICE_ID, TEMPLATE_ID, templateParams, PUBLIC_KEY)
+                  .then((response) => {
+                      alert(`⚠️ LOW STOCK ALERT: Quotation request sent to ${supplier.name} successfully!`);
+                  })
+                  .catch((err) => {
+                      console.error('FAILED TO SEND EMAIL:', err);
+                      alert("Low stock detected, but failed to send email. Check console.");
+                  });
+          } else {
+              alert("⚠️ Low Stock! (No supplier email found to send quotation)");
+          }
+      }
+  };
+
+  // --- 3. HANDLERS: STOCK ---
   const handleSaveStock = async (e) => {
     e.preventDefault();
     if (!stockForm.itemName || !stockForm.quantity) return alert("Name and Qty required");
@@ -67,9 +106,13 @@ const Inventory = () => {
         if (editingId) {
             await updateDoc(doc(db, "inventory", editingId), payload);
             alert("Stock Updated Successfully");
+            // CHECK FOR LOW STOCK AFTER UPDATE
+            checkAndSendMail(payload); 
         } else {
             await addDoc(collection(db, "inventory"), { ...payload, createdAt: serverTimestamp() });
             alert("New Item Added to Inventory");
+            // Check (though unlikely new item is low immediately, but good practice)
+            checkAndSendMail(payload);
         }
         closeModal();
     } catch (error) {
@@ -88,7 +131,7 @@ const Inventory = () => {
       }
   };
 
-  // --- 3. HANDLERS: SUPPLIERS ---
+  // --- 4. HANDLERS: SUPPLIERS ---
   const handleSaveSupplier = async (e) => {
       e.preventDefault();
       if (!supplierForm.name) return alert("Supplier Name required");
@@ -96,7 +139,8 @@ const Inventory = () => {
       const payload = {
           name: supplierForm.name,
           contact: supplierForm.contact,
-          address: supplierForm.address
+          address: supplierForm.address,
+          email: supplierForm.email // Save email so we can use it later
       };
 
       try {
@@ -118,7 +162,7 @@ const Inventory = () => {
       }
   };
 
-  // --- 4. HELPER FUNCTIONS ---
+  // --- 5. HELPER FUNCTIONS ---
   const openEditModal = (item, type) => {
       setEditingId(item.id);
       if (type === 'STOCK') {
@@ -128,7 +172,7 @@ const Inventory = () => {
           });
       } else {
           setSupplierForm({
-              name: item.name, contact: item.contact, address: item.address
+              name: item.name, contact: item.contact, address: item.address, email: item.email || ''
           });
       }
       setIsModalOpen(true);
@@ -138,7 +182,7 @@ const Inventory = () => {
       setIsModalOpen(false);
       setEditingId(null);
       setStockForm({ itemName: '', category: '', quantity: '', unit: 'kg', minStock: '', supplierId: '' });
-      setSupplierForm({ name: '', contact: '', address: '' });
+      setSupplierForm({ name: '', contact: '', address: '', email: '' });
   };
 
   const getSupplierName = (id) => {
@@ -146,7 +190,6 @@ const Inventory = () => {
       return sup ? sup.name : '-';
   };
 
-  // Filter Logic
   const filteredInventory = inventory.filter(i => (i.itemName || "").toLowerCase().includes(searchTerm.toLowerCase()));
   const filteredSuppliers = suppliers.filter(s => (s.name || "").toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -165,36 +208,19 @@ const Inventory = () => {
             </div>
         </div>
         
-        {/* TABS */}
         <div style={{ display: 'flex', backgroundColor: 'white', borderRadius: '8px', overflow: 'hidden', border: '1px solid #ddd' }}>
-            <button 
-                onClick={() => setActiveTab('STOCK')}
-                style={{ ...styles.tabBtn, backgroundColor: activeTab === 'STOCK' ? 'black' : 'white', color: activeTab === 'STOCK' ? 'white' : 'black' }}
-            >
-                Stock Items
-            </button>
-            <button 
-                onClick={() => setActiveTab('SUPPLIERS')}
-                style={{ ...styles.tabBtn, backgroundColor: activeTab === 'SUPPLIERS' ? 'black' : 'white', color: activeTab === 'SUPPLIERS' ? 'white' : 'black' }}
-            >
-                Suppliers
-            </button>
+            <button onClick={() => setActiveTab('STOCK')} style={{ ...styles.tabBtn, backgroundColor: activeTab === 'STOCK' ? 'black' : 'white', color: activeTab === 'STOCK' ? 'white' : 'black' }}>Stock Items</button>
+            <button onClick={() => setActiveTab('SUPPLIERS')} style={{ ...styles.tabBtn, backgroundColor: activeTab === 'SUPPLIERS' ? 'black' : 'white', color: activeTab === 'SUPPLIERS' ? 'white' : 'black' }}>Suppliers</button>
         </div>
       </div>
 
       {/* CONTROLS */}
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', gap: '10px' }}>
-          <input 
-            type="text" placeholder="Search..." 
-            value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-            style={styles.searchInput}
-          />
-          <button onClick={() => setIsModalOpen(true)} style={styles.addBtn}>
-              {activeTab === 'STOCK' ? '+ Add Stock Item' : '+ Add Supplier'}
-          </button>
+          <input type="text" placeholder="Search..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={styles.searchInput} />
+          <button onClick={() => setIsModalOpen(true)} style={styles.addBtn}>{activeTab === 'STOCK' ? '+ Add Stock Item' : '+ Add Supplier'}</button>
       </div>
 
-      {/* --- TAB CONTENT: STOCK --- */}
+      {/* --- STOCK TABLE --- */}
       {activeTab === 'STOCK' && (
           <div style={styles.tableContainer}>
               <table style={styles.table}>
@@ -218,9 +244,7 @@ const Inventory = () => {
                                     {isLowStock && <span style={styles.lowStockBadge}>LOW</span>}
                                 </td>
                                 <td style={styles.td}>{item.category}</td>
-                                <td style={{...styles.td, color: isLowStock ? 'red' : 'green', fontWeight:'bold', fontSize:'1.1rem'}}>
-                                    {item.quantity}
-                                </td>
+                                <td style={{...styles.td, color: isLowStock ? 'red' : 'green', fontWeight:'bold', fontSize:'1.1rem'}}>{item.quantity}</td>
                                 <td style={styles.td}>{item.unit}</td>
                                 <td style={{...styles.td, fontSize:'0.9rem', color:'#666'}}>{getSupplierName(item.supplierId)}</td>
                                 <td style={{...styles.td, textAlign:'right'}}>
@@ -230,20 +254,20 @@ const Inventory = () => {
                             </tr>
                           );
                       })}
-                      {filteredInventory.length === 0 && <tr><td colSpan="6" style={styles.empty}>No items found.</td></tr>}
                   </tbody>
               </table>
           </div>
       )}
 
-      {/* --- TAB CONTENT: SUPPLIERS --- */}
+      {/* --- SUPPLIERS TABLE --- */}
       {activeTab === 'SUPPLIERS' && (
           <div style={styles.tableContainer}>
               <table style={styles.table}>
                   <thead style={styles.thead}>
                       <tr>
                           <th style={styles.th}>Supplier Name</th>
-                          <th style={styles.th}>Contact Info</th>
+                          <th style={styles.th}>Contact</th>
+                          <th style={styles.th}>Email</th>
                           <th style={styles.th}>Address</th>
                           <th style={{...styles.th, textAlign:'right'}}>Actions</th>
                       </tr>
@@ -253,6 +277,7 @@ const Inventory = () => {
                           <tr key={sup.id} style={{ borderBottom: '1px solid #eee' }}>
                               <td style={{...styles.td, fontWeight:'bold'}}>{sup.name}</td>
                               <td style={styles.td}>{sup.contact}</td>
+                              <td style={styles.td}>{sup.email || '-'}</td>
                               <td style={styles.td}>{sup.address}</td>
                               <td style={{...styles.td, textAlign:'right'}}>
                                   <button onClick={() => openEditModal(sup, 'SUPPLIERS')} style={styles.editBtn}>Edit</button>
@@ -260,7 +285,6 @@ const Inventory = () => {
                               </td>
                           </tr>
                       ))}
-                      {filteredSuppliers.length === 0 && <tr><td colSpan="4" style={styles.empty}>No suppliers found.</td></tr>}
                   </tbody>
               </table>
           </div>
@@ -276,15 +300,13 @@ const Inventory = () => {
                       <form onSubmit={handleSaveStock} style={{display:'grid', gap:'10px'}}>
                           <div>
                               <label style={styles.label}>Item Name</label>
-                              <input type="text" required placeholder="e.g. Chicken, Oil, Rice" value={stockForm.itemName} onChange={e => setStockForm({...stockForm, itemName: e.target.value})} style={styles.input} />
+                              <input type="text" required value={stockForm.itemName} onChange={e => setStockForm({...stockForm, itemName: e.target.value})} style={styles.input} />
                           </div>
                           <div style={{display:'flex', gap:'10px'}}>
                               <div style={{flex:1}}>
                                   <label style={styles.label}>Quantity</label>
                                   <input type="number" step="0.01" required value={stockForm.quantity} onChange={e => setStockForm({...stockForm, quantity: e.target.value})} style={styles.input} />
                               </div>
-                              
-                              {/* --- UPDATED UNIT SELECTION --- */}
                               <div style={{flex:1}}>
                                   <label style={styles.label}>Unit</label>
                                   <select value={stockForm.unit} onChange={e => setStockForm({...stockForm, unit: e.target.value})} style={styles.input}>
@@ -306,7 +328,7 @@ const Inventory = () => {
                               </div>
                               <div style={{flex:1}}>
                                   <label style={styles.label}>Category</label>
-                                  <input type="text" placeholder="e.g. Veg, Meat" value={stockForm.category} onChange={e => setStockForm({...stockForm, category: e.target.value})} style={styles.input} />
+                                  <input type="text" placeholder="e.g. Veg" value={stockForm.category} onChange={e => setStockForm({...stockForm, category: e.target.value})} style={styles.input} />
                               </div>
                           </div>
                           <div>
@@ -326,6 +348,10 @@ const Inventory = () => {
                           <div>
                               <label style={styles.label}>Supplier Name</label>
                               <input type="text" required value={supplierForm.name} onChange={e => setSupplierForm({...supplierForm, name: e.target.value})} style={styles.input} />
+                          </div>
+                          <div>
+                              <label style={styles.label}>Email</label>
+                              <input type="email" value={supplierForm.email} onChange={e => setSupplierForm({...supplierForm, email: e.target.value})} style={styles.input} />
                           </div>
                           <div>
                               <label style={styles.label}>Contact No.</label>
