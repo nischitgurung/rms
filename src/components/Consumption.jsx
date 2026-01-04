@@ -17,6 +17,8 @@ const Consumption = () => {
   const [selectedDish, setSelectedDish] = useState(null);
 
   const [ingredientForm, setIngredientForm] = useState({ stockId: '', qty: '' });
+  // ADDED: Search state for ingredient picker
+  const [ingSearch, setIngSearch] = useState('');
 
   // --- 1. DATA FETCHING ---
   useEffect(() => {
@@ -76,6 +78,7 @@ const Consumption = () => {
           await updateDoc(doc(db, "menu_items", selectedDish.id), { recipe: updatedRecipe });
           setSelectedDish({ ...selectedDish, recipe: updatedRecipe }); 
           setIngredientForm({ stockId: '', qty: '' });
+          setIngSearch(''); // Reset search
       } catch (error) { alert("Error: " + error.message); }
   };
 
@@ -113,6 +116,12 @@ const Consumption = () => {
       return Object.values(usageMap);
   };
 
+  // ADDED: Logic to filter stock items by name OR nickname (SEO Alias)
+  const filteredStock = stockItems.filter(s => 
+    s.itemName?.toLowerCase().includes(ingSearch.toLowerCase()) || 
+    s.seoTitle?.toLowerCase().includes(ingSearch.toLowerCase())
+  );
+
   if (loading) return <div style={{padding:'40px', textAlign: 'center'}}>Loading Data...</div>;
 
   return (
@@ -147,10 +156,20 @@ const Consumption = () => {
 
               {selectedDish && (
                 <div style={{ ...styles.card, flex: 2 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-                        <h2 style={{ margin: 0, color:'#2196F3', fontSize: '1.2rem' }}>{selectedDish.name}</h2>
-                        {isMobile && <button onClick={() => setSelectedDish(null)} style={styles.closeBtn}>Back to List</button>}
+                    <div style={{ display: 'flex', flexDirection:'column', marginBottom: '15px' }}>
+                        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                            <h2 style={{ margin: 0, color:'#2196F3', fontSize: '1.2rem' }}>{selectedDish.name}</h2>
+                            {isMobile && <button onClick={() => setSelectedDish(null)} style={styles.closeBtn}>Back to List</button>}
+                        </div>
+                        
+                        {/* ADDED: QUALITY SOP (META DESCRIPTION) DISPLAY */}
+                        {selectedDish.seoDescription && (
+                            <div style={{marginTop:'10px', padding:'10px', background:'#FFF9C4', borderRadius:'6px', borderLeft:'4px solid #FBC02D', fontSize:'0.8rem'}}>
+                                <strong>💡 Quality SOP:</strong> {selectedDish.seoDescription}
+                            </div>
+                        )}
                     </div>
+
                     <div style={{ overflowX: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px', minWidth: '300px' }}>
                             <thead style={{ backgroundColor: '#f9f9f9' }}>
@@ -168,13 +187,24 @@ const Consumption = () => {
                             </tbody>
                         </table>
                     </div>
+                    
                     <div style={{ backgroundColor: '#f0f4f8', padding: '15px', borderRadius: '8px' }}>
                         <form onSubmit={handleAddIngredient} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <label style={styles.label}>Select Raw Material</label>
+                            <label style={styles.label}>Select Raw Material (Search by Name or Alias)</label>
+                            
+                            {/* ADDED: SEARCH INPUT FOR INGREDIENTS */}
+                            <input 
+                                type="text" 
+                                placeholder="Type alias e.g. 'Momo bag'..." 
+                                value={ingSearch}
+                                onChange={(e) => setIngSearch(e.target.value)}
+                                style={{...styles.input, marginBottom:'5px'}}
+                            />
+
                             <select required value={ingredientForm.stockId} onChange={e => setIngredientForm({...ingredientForm, stockId: e.target.value})} style={styles.input}>
-                                <option value="">-- Choose --</option>
-                                {stockItems.map(s => (
-                                    <option key={s.id} value={s.id}>{s.itemName} ({s.unit})</option>
+                                <option value="">-- Choose from {filteredStock.length} items --</option>
+                                {filteredStock.map(s => (
+                                    <option key={s.id} value={s.id}>{s.itemName} ({s.unit}) {s.seoTitle && `- ${s.seoTitle}`}</option>
                                 ))}
                             </select>
                             <label style={styles.label}>Quantity {ingredientForm.stockId ? `(${getSelectedStockUnit()})` : ''}</label>
