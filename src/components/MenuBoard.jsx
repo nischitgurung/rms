@@ -18,7 +18,7 @@ const styles = {
   qtyBtn: { width:'32px', height:'32px', borderRadius:'8px', border:'1px solid #ddd', cursor:'pointer', background:'white', fontWeight:'bold', fontSize:'1.1rem', display:'flex', alignItems:'center', justifyContent:'center' },
   catBtn: { padding: '10px 20px', borderRadius: '30px', border: '1px solid #eee', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: '600', fontSize: '0.9rem', transition: 'all 0.2s', boxShadow:'0 2px 5px rgba(0,0,0,0.05)' },
   
-  // FIX: CARD LAYOUT TO FORCE PRICE VISIBILITY
+  // CARD STYLING
   itemCard: { 
     backgroundColor: 'white', 
     borderRadius: '16px', 
@@ -29,54 +29,112 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     height: '100%', 
-    minHeight: '280px', // Increased slightly to ensure room for price
+    minHeight: '260px', 
     transition: 'transform 0.2s, box-shadow 0.2s',
     boxSizing: 'border-box',
     position: 'relative'
   },
+  
+  // SINGLE IMAGE
   itemImage: {
     width: '100%',
-    aspectRatio: '4/3', // Keeps image strict square-ish rectangle
+    height: '160px', 
     objectFit: 'cover', 
     backgroundColor: '#f8f9fa',
-    flexShrink: 0 // Prevents image from shrinking
+    flexShrink: 0
   },
+
+  // COMBO TEXT BOX (Replaces Image Grid)
+  comboTextBox: {
+    width: '100%',
+    height: '160px',
+    backgroundColor: '#E3F2FD', // Light Blue background for deals
+    color: '#1565C0',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '15px',
+    boxSizing: 'border-box',
+    flexShrink: 0,
+    fontSize: '0.9rem',
+    fontWeight: '500',
+    textAlign: 'center',
+    lineHeight: '1.5'
+  },
+
   itemInfo: {
-    padding: '12px',
+    padding: '12px 15px',
     textAlign: 'left',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
-    flexGrow: 1, // Forces this section to fill remaining height
-    minHeight: '100px' // Guarantees space for text and price
+    flexGrow: 1, 
+    minHeight: '0' 
   },
   itemNameText: {
-    margin: '0 0 8px 0', 
+    margin: '0 0 5px 0', 
     fontSize: '1rem', 
     fontWeight: '700',
-    lineHeight: '1.3em',
-    // Limit to 2 lines so it doesn't push price out
-    height: '2.6em', 
-    overflow: 'hidden',
+    lineHeight: '1.2em',
+    color: '#2c3e50',
     display: '-webkit-box',
     WebkitLineClamp: 2,
     WebkitBoxOrient: 'vertical',
-    color: '#2c3e50'
+    overflow: 'hidden'
   },
-  // FIX: PRICE STYLING
   itemPriceText: {
     fontWeight: '800', 
     color: '#27ae60', 
     fontSize: '1.1rem',
-    marginTop: 'auto', // Critical: Pushes price to the absolute bottom of the flex container
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%'
+    marginTop: '8px',
+    display: 'block'
   },
-  sendBtn: { width: '100%', padding: '18px', backgroundColor: '#2c3e50', color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.1rem', letterSpacing:'0.5px' },
+  
+  // MODAL STYLING
   modalOverlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, backdropFilter: 'blur(3px)' },
-  modal: { backgroundColor: 'white', padding: '0', borderRadius: '20px', width: '380px', maxWidth: '90%', textAlign: 'center', overflow: 'hidden', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' },
+  modal: { 
+    backgroundColor: 'white', 
+    padding: '0', 
+    borderRadius: '20px', 
+    width: '420px', 
+    maxWidth: '90%', 
+    textAlign: 'center', 
+    overflow: 'hidden', 
+    boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+    display: 'flex',       
+    flexDirection: 'column' 
+  },
+  
+  // COMBO BADGE
+  comboBadge: {
+    position: 'absolute',
+    top: '10px',
+    left: '10px',
+    backgroundColor: '#FF9800',
+    color: 'white',
+    padding: '4px 8px',
+    borderRadius: '12px',
+    fontSize: '0.75rem',
+    fontWeight: 'bold',
+    zIndex: 10,
+    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+  },
+
+  // FIX: RESTORED ORIGINAL BLACK BUTTON STYLE
+  sendBtn: { 
+    width: '100%', 
+    padding: '18px', 
+    backgroundColor: 'black', // Back to Black
+    color: 'white', 
+    border: 'none', 
+    borderRadius: '12px', 
+    cursor: 'pointer', 
+    fontWeight: 'bold', 
+    fontSize: '1.1rem', 
+    letterSpacing:'0.5px' 
+  },
+
   searchInput: { width: '100%', padding: '12px 20px', borderRadius: '30px', border: '1px solid #ddd', marginBottom: '15px', fontSize: '1rem', outline: 'none', boxShadow:'inset 0 2px 5px rgba(0,0,0,0.02)' }
 };
 
@@ -98,7 +156,6 @@ const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, upd
       </div>
     </div>
 
-    {/* COMBO NOTIFICATION */}
     {detectedCombos.length > 0 && (
       <div style={{ backgroundColor: '#E3F2FD', padding: '12px 20px', borderBottom: '1px solid #BBDEFB' }}>
         {detectedCombos.map(combo => (
@@ -151,8 +208,10 @@ const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, upd
         <span>Total</span>
         <span>Rs. {cart.reduce((acc, item) => acc + (item.price * item.qty), 0).toFixed(2)}</span>
       </div>
+      
+      {/* FIX: RESTORED ORIGINAL TEXT */}
       <button onClick={handleSendClick} style={styles.sendBtn}>
-        {initialTableId === 'Walk-in' ? 'SELECT TABLE' : 'SEND TO KITCHEN'}
+        {initialTableId === 'Walk-in' ? 'SELECT TABLE & SEND' : 'SEND TO KITCHEN'}
       </button>
     </div>
   </div>
@@ -163,22 +222,26 @@ const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, upd
 // ==========================================
 const MenuView = ({ categories, activeCategory, setActiveCategory, items, handleItemClick, isMobile, searchTerm, setSearchTerm }) => {
   const filteredItems = items.filter(item => {
-    const matchesCategory = activeCategory === 'All' || item.categoryId === activeCategory;
+    const matchesCategory = activeCategory === 'All' || item.categoryId === activeCategory || (activeCategory === 'Deals' && item.isCombo);
     const matchesSearch = 
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        (item.seoTitle && item.seoTitle.toLowerCase().includes(searchTerm.toLowerCase()));
+        (item.seoTitle && item.seoTitle.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (item.seoDescription && item.seoDescription.toLowerCase().includes(searchTerm.toLowerCase())); 
     return matchesCategory && matchesSearch;
   });
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: isMobile ? 'calc(100vh - 60px)' : '100vh', backgroundColor:'#f4f6f8' }}>
       <div style={{ padding: '20px', backgroundColor: 'white', borderBottom: '1px solid #eee' }}>
-        <input type="text" placeholder="🔍 Find food, drinks, desserts..." style={styles.searchInput} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        <input type="text" placeholder="🔍 Find food, drinks, bundles..." style={styles.searchInput} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '5px', scrollbarWidth: 'none' }}>
           <button onClick={() => setActiveCategory('All')} style={{ ...styles.catBtn, backgroundColor: activeCategory === 'All' ? '#2c3e50' : 'white', color: activeCategory === 'All' ? 'white' : '#2c3e50' }}>All Items</button>
+          
           {categories.map(cat => (
              <button key={cat.id} onClick={() => setActiveCategory(cat.id)} style={{ ...styles.catBtn, backgroundColor: activeCategory === cat.id ? '#2c3e50' : 'white', color: activeCategory === cat.id ? 'white' : '#2c3e50' }}>{cat.name}</button>
           ))}
+          
+          <button onClick={() => setActiveCategory('Deals')} style={{ ...styles.catBtn, backgroundColor: activeCategory === 'Deals' ? '#E65100' : 'white', color: activeCategory === 'Deals' ? 'white' : '#E65100', border:'1px solid #E65100' }}>⭐ Deals</button>
         </div>
       </div>
       
@@ -189,20 +252,30 @@ const MenuView = ({ categories, activeCategory, setActiveCategory, items, handle
       }}>
         {filteredItems.map(item => (
           <div key={item.id} onClick={() => handleItemClick(item)} style={styles.itemCard}>
-            <img 
-              src={item.imageUrl || 'https://via.placeholder.com/300x200?text=No+Image'} 
-              alt={item.altText || item.name} 
-              style={styles.itemImage} 
-              loading="lazy"
-            />
+            
+            {item.isCombo && <div style={styles.comboBadge}>DEAL</div>}
+
+            {/* COMBO DISPLAY: TEXT ONLY, NO PICTURE */}
+            {item.isCombo ? (
+                <div style={styles.comboTextBox}>
+                    {item.comboItems && item.comboItems.slice(0,4).map((sub, i) => (
+                        <div key={i}>• {sub.qty}x {sub.name}</div>
+                    ))}
+                    {item.comboItems && item.comboItems.length > 4 && <div>...</div>}
+                </div>
+            ) : (
+                <img 
+                  src={item.imageUrl || 'https://via.placeholder.com/300x200?text=No+Image'} 
+                  alt={item.altText || item.name} 
+                  style={styles.itemImage} 
+                  loading="lazy"
+                />
+            )}
+
             <div style={styles.itemInfo}>
-              <h4 style={styles.itemNameText}>{item.isCombo && '🎁 '}{item.name}</h4>
-              
-              {/* --- PRICE VISIBILITY FIX --- */}
+              <h4 style={styles.itemNameText}>{item.name}</h4>
               <div style={styles.itemPriceText}>
-                <span>Rs. {item.price}</span>
-                {/* Optional Plus icon for UX */}
-                <span style={{fontSize:'1.2rem', color:'#ccc', fontWeight:'normal'}}>+</span>
+                Rs. {item.price || '0'}
               </div>
             </div>
           </div>
@@ -260,6 +333,7 @@ const MenuBoard = () => {
   const location = useLocation();
   const { tableId: initialTableId, tableName: initialTableName } = location.state || { tableId: 'Walk-in', tableName: 'Walk-in' };
 
+  // DATA STATES
   const [categories, setCategories] = useState([]);
   const [items, setItems] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
@@ -267,6 +341,7 @@ const MenuBoard = () => {
   const [combos, setCombos] = useState([]); 
   const [tables, setTables] = useState([]);
 
+  // UI STATES
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState(''); 
   const [cart, setCart] = useState([]);
@@ -284,21 +359,46 @@ const MenuBoard = () => {
 
     const fetchData = async () => {
       try {
+        // 1. Fetch Categories
         const catSnap = await getDocs(collection(db, "categories"));
-        const itemSnap = await getDocs(collection(db, "menu_items"));
-        const modSnap = await getDocs(collection(db, "modifiers"));
-        const comboSnap = await getDocs(collection(db, "combos")); 
+        const fetchedCategories = catSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+        setCategories(fetchedCategories);
 
-        setCategories(catSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (a.sortOrder || 0) - (b.sortOrder || 0)));
-        
-        // --- MERGE ITEMS AND COMBOS ---
+        // 2. Fetch Menu Items (Needed to map images to combos)
+        const itemSnap = await getDocs(collection(db, "menu_items"));
         const fetchedMenuItems = itemSnap.docs.map(d => ({id: d.id, ...d.data()}));
-        const fetchedCombos = comboSnap.docs.map(d => ({id: d.id, ...d.data(), isCombo: true, categoryId: 'Deals'})); 
         
+        // Create a quick lookup map for images: ID -> ImageURL
+        const imageMap = {};
+        fetchedMenuItems.forEach(i => { imageMap[i.id] = i.imageUrl; });
+
+        // 3. Fetch Combos & Enrich with Images
+        const comboSnap = await getDocs(collection(db, "combos")); 
+        const fetchedCombos = comboSnap.docs.map(d => {
+            const data = d.data();
+            // Enrich contents with images
+            const enrichedContents = (data.comboItems || []).map(ci => ({
+                ...ci,
+                imageUrl: imageMap[ci.id] || null // Map ID to URL
+            }));
+
+            return {
+                id: d.id, 
+                ...data,
+                comboItems: enrichedContents, 
+                isCombo: true, 
+                categoryId: 'Deals'
+            };
+        });
+
+        // 4. Merge All Items
         setItems([...fetchedMenuItems, ...fetchedCombos]); 
         setCombos(fetchedCombos); 
         
+        // 5. Modifiers
+        const modSnap = await getDocs(collection(db, "modifiers"));
         setModifiers(modSnap.docs.map(d => ({id: d.id, ...d.data()})).filter(m => m.isAvailable)); 
+        
         setLoading(false);
       } catch (error) { console.error(error); }
     };
@@ -447,21 +547,34 @@ const MenuBoard = () => {
         {isModalOpen && selectedItem && (
           <div style={styles.modalOverlay}>
             <div style={styles.modal}>
-              <div style={{position:'relative'}}>
-                  <img src={selectedItem.imageUrl || 'https://via.placeholder.com/300x200'} alt={selectedItem.name} style={{ width: '100%', height: '180px', objectFit: 'cover' }} />
-                  <div style={{position:'absolute', top:'10px', right:'10px', background:'rgba(255,255,255,0.9)', color:'#2c3e50', padding:'5px 12px', borderRadius:'15px', fontSize:'0.9rem', fontWeight:'bold', boxShadow:'0 2px 5px rgba(0,0,0,0.1)'}}>
-                      Rs. {selectedItem.price}
-                  </div>
-              </div>
               
-              <div style={{padding:'20px'}}>
-                  <h2 style={{margin:'0 0 10px 0', color:'#2c3e50'}}>{selectedItem.name}</h2>
+              {/* IMAGE HEADER - REMOVED IMAGE FOR COMBOS */}
+              {!selectedItem.isCombo && (
+                  <div style={{width:'100%', height:'200px', position:'relative', backgroundColor:'#eee'}}>
+                      <img 
+                        src={selectedItem.imageUrl || 'https://via.placeholder.com/300x200'} 
+                        alt={selectedItem.name} 
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }} 
+                      />
+                      <div style={{position:'absolute', top:'15px', right:'15px', background:'white', color:'#2c3e50', padding:'6px 14px', borderRadius:'20px', fontSize:'1rem', fontWeight:'800', boxShadow:'0 2px 8px rgba(0,0,0,0.2)'}}>
+                          Rs. {selectedItem.price}
+                      </div>
+                  </div>
+              )}
+              
+              {/* CONTENT AREA */}
+              <div style={{padding:'20px', textAlign:'left', flex: 1, display:'flex', flexDirection:'column'}}>
+                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'start'}}>
+                      <h2 style={{margin:'0 0 10px 0', color:'#2c3e50', fontSize:'1.4rem'}}>{selectedItem.name}</h2>
+                      {/* Show Price here if it's a Combo since header is gone */}
+                      {selectedItem.isCombo && <h2 style={{margin:'0', color:'#27ae60', fontSize:'1.4rem'}}>Rs. {selectedItem.price}</h2>}
+                  </div>
 
-                  {/* COMBO CONTENTS */}
+                  {/* COMBO CONTENTS LIST */}
                   {selectedItem.isCombo && selectedItem.comboItems && (
-                      <div style={{backgroundColor:'#E3F2FD', padding:'10px', borderRadius:'8px', marginBottom:'15px', textAlign:'left'}}>
-                          <h4 style={{margin:'0 0 5px 0', fontSize:'0.9rem', color:'#1565C0'}}>Combo Includes:</h4>
-                          <ul style={{margin:0, paddingLeft:'20px', fontSize:'0.85rem', color:'#333'}}>
+                      <div style={{backgroundColor:'#E3F2FD', padding:'12px', borderRadius:'10px', marginBottom:'15px'}}>
+                          <h4 style={{margin:'0 0 5px 0', fontSize:'0.9rem', color:'#1565C0', textTransform:'uppercase', letterSpacing:'0.5px'}}>Includes:</h4>
+                          <ul style={{margin:0, paddingLeft:'20px', fontSize:'0.9rem', color:'#333', lineHeight:'1.5'}}>
                               {selectedItem.comboItems.map((c, i) => (
                                   <li key={i}>{c.qty}x {c.name}</li>
                               ))}
@@ -471,22 +584,23 @@ const MenuBoard = () => {
 
                   {/* SEO Note */}
                   {selectedItem.seoDescription && (
-                    <div style={{ backgroundColor: '#FFF9C4', padding: '10px', borderRadius: '8px', marginBottom: '15px', borderLeft: '4px solid #FBC02D', textAlign: 'left', fontSize: '0.85rem' }}>
-                      <strong>Note:</strong> {selectedItem.seoDescription}
+                    <div style={{ backgroundColor: '#FFF3E0', padding: '10px', borderRadius: '8px', marginBottom: '15px', borderLeft: '4px solid #FF9800', fontSize: '0.9rem', color:'#555' }}>
+                      {selectedItem.seoDescription}
                     </div>
                   )}
 
-                  <div style={{ maxHeight: '150px', overflowY: 'auto', border: '1px solid #eee', padding: '10px', borderRadius: '8px', marginBottom: '20px', textAlign: 'left' }}>
+                  <div style={{ flex: 1, maxHeight: '150px', overflowY: 'auto', border: '1px solid #eee', padding: '10px', borderRadius: '8px', marginBottom: '20px' }}>
                       {modifiers.map(mod => (
-                          <label key={mod.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f9f9f9', cursor: 'pointer' }}>
-                              <span><input type="checkbox" onChange={() => toggleExtra(mod)} style={{ marginRight: '10px' }} />{mod.name}</span><span>+Rs.{mod.price}</span>
+                          <label key={mod.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f9f9f9', cursor: 'pointer', fontSize:'0.95rem' }}>
+                              <span><input type="checkbox" onChange={() => toggleExtra(mod)} style={{ marginRight: '10px', transform:'scale(1.2)' }} />{mod.name}</span>
+                              <span style={{fontWeight:'bold', color:'#666'}}>+Rs.{mod.price}</span>
                           </label>
                       ))}
                   </div>
                   
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                      <button onClick={() => setIsModalOpen(false)} style={{ flex: 1, padding: '12px', borderRadius: '8px', border:'1px solid #ddd', background:'white', cursor:'pointer', fontWeight:'bold', color:'#555' }}>Cancel</button>
-                      <button onClick={confirmAddToCart} style={{ flex: 1, padding: '12px', backgroundColor: '#2c3e50', color: 'white', borderRadius: '8px', border:'none', cursor:'pointer', fontWeight:'bold' }}>Add to Cart</button>
+                  <div style={{ display: 'flex', gap: '15px', marginTop:'auto' }}>
+                      <button onClick={() => setIsModalOpen(false)} style={{ flex: 1, padding: '14px', borderRadius: '10px', border:'1px solid #ddd', background:'white', cursor:'pointer', fontWeight:'bold', color:'#555', fontSize:'1rem' }}>Cancel</button>
+                      <button onClick={confirmAddToCart} style={{ flex: 1, padding: '14px', backgroundColor: '#2c3e50', color: 'white', borderRadius: '10px', border:'none', cursor:'pointer', fontWeight:'bold', fontSize:'1rem' }}>Add to Cart</button>
                   </div>
               </div>
             </div>
