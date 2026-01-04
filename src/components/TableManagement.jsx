@@ -2,8 +2,22 @@ import KhaltiCheckout from "khalti-checkout-web";
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, updateDoc, query, where, serverTimestamp, writeBatch } from 'firebase/firestore';
-import { Helmet, HelmetProvider } from 'react-helmet-async'; // SEO Import
+import { collection, onSnapshot, doc, updateDoc, query, where, serverTimestamp, writeBatch, addDoc, deleteDoc } from 'firebase/firestore';
+import { Helmet, HelmetProvider } from 'react-helmet-async'; 
+
+// --- HELPER: PARSE TIME STRING TO DATE OBJECT ---
+// Converts "7:30 PM" to a Date object for today
+const parseTime = (timeStr) => {
+    if (!timeStr) return null;
+    const [time, modifier] = timeStr.split(' ');
+    let [hours, minutes] = time.split(':');
+    if (hours === '12') hours = '00';
+    if (modifier === 'PM') hours = parseInt(hours, 10) + 12;
+    
+    const date = new Date();
+    date.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0);
+    return date;
+};
 
 const TableManagement = () => {
   const navigate = useNavigate();
@@ -13,7 +27,7 @@ const TableManagement = () => {
   const [activeOrders, setActiveOrders] = useState([]); 
   const [loading, setLoading] = useState(true);
   
-  // Search & Filter State (NEW)
+  // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
 
   // Modal & View State
@@ -22,6 +36,10 @@ const TableManagement = () => {
   const [currentTableOrders, setCurrentTableOrders] = useState([]); 
   const [grandTotal, setGrandTotal] = useState(0);
   
+  // Table Management State
+  const [isAddingTable, setIsAddingTable] = useState(false);
+  const [newTableName, setNewTableName] = useState('');
+
   // Payment State
   const [paymentMethod, setPaymentMethod] = useState('Cash');
   const [showKhaltiQR, setShowKhaltiQR] = useState(false);
@@ -48,20 +66,21 @@ const TableManagement = () => {
     "paymentPreference": ["KHALTI", "EBANKING", "MOBILE_BANKING", "CONNECT_IPS", "SCT"],
   };
 
-  // --- 1. FETCH TABLES & ALL ACTIVE ORDERS ---
+  // --- 1. FETCH TABLES & ACTIVE ORDERS ---
   useEffect(() => {
-    // A. Tables Listener
     const unsubTables = onSnapshot(collection(db, "tables"), (snapshot) => {
       const tableData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      // --- SORTING LOGIC: NUMERIC FIRST, THEN NEWLY ADDED AT END ---
       const sortedTables = tableData.sort((a, b) => {
-        const numA = parseInt(a.name.replace(/^\D+/g, '')) || 0;
-        const numB = parseInt(b.name.replace(/^\D+/g, '')) || 0;
+        const numA = parseInt(a.name.replace(/^\D+/g, '')) || 999999; // If no number, push to end
+        const numB = parseInt(b.name.replace(/^\D+/g, '')) || 999999;
         return numA - numB;
       });
+      
       setTables(sortedTables);
     });
 
-    // B. Active Orders Listener
     const qOrders = query(collection(db, "orders"), where("status", "!=", "PAID"));
     const unsubOrders = onSnapshot(qOrders, (snapshot) => {
         const ordersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -75,15 +94,40 @@ const TableManagement = () => {
     };
   }, []);
 
+  // --- 2. AUTO-RELEASE EXPIRED RESERVATIONS ---
+  useEffect(() => {
+      const checkReservations = setInterval(() => {
+          const now = new Date();
+          
+          tables.forEach(async (table) => {
+              if (table.status === 'Reserved' && table.arrivalTime) {
+                  const arrivalDate = parseTime(table.arrivalTime);
+                  // If current time > arrival time (guest is late), release table
+                  if (arrivalDate && now > arrivalDate) {
+                      console.log(`Auto-releasing table ${table.name} due to expiration.`);
+                      try {
+                          await updateDoc(doc(db, "tables", table.id), {
+                              status: "Available",
+                              reservedBy: null,
+                              arrivalTime: null
+                          });
+                      } catch (err) {
+                          console.error("Auto-release failed", err);
+                      }
+                  }
+              }
+          });
+      }, 60000); // Check every 1 minute
+
+      return () => clearInterval(checkReservations);
+  }, [tables]);
+
   // --- HELPER: GET DATA FOR SPECIFIC TABLE ---
   const getTableData = (tableName) => {
       const tableOrders = activeOrders.filter(o => o.tableId === tableName);
       if (tableOrders.length === 0) return { status: null, items: [] };
       
-      // Sort to get latest status
       const latestOrder = [...tableOrders].sort((a,b) => b.createdAt - a.createdAt)[0];
-      
-      // Flatten all items for search
       const allItems = tableOrders.flatMap(o => o.items.map(i => i.name.toLowerCase()));
       
       return { 
@@ -92,23 +136,60 @@ const TableManagement = () => {
       };
   };
 
-  // --- SEARCH FILTER LOGIC ---
+  // --- SEARCH FILTER LOGIC (UPDATED WITH ARRIVAL TIME) ---
   const filteredTables = tables.filter(table => {
       if (!searchTerm) return true;
       const term = searchTerm.toLowerCase();
       
-      // 1. Search by Table Name
+      // 1. Search Table Name
       if (table.name.toLowerCase().includes(term)) return true;
 
-      // 2. Search by Reservation Name
+      // 2. Search Reservation Name
       if (table.status === 'Reserved' && table.reservedBy && table.reservedBy.toLowerCase().includes(term)) return true;
 
-      // 3. Search by Food Items Ordered (Advanced Feature)
+      // 3. Search Arrival Time (New Feature)
+      if (table.status === 'Reserved' && table.arrivalTime && table.arrivalTime.toLowerCase().includes(term)) return true;
+
+      // 4. Search Ordered Items
       const { items } = getTableData(table.name);
       if (items.some(itemName => itemName.includes(term))) return true;
 
       return false;
   });
+
+  // --- TABLE CRUD OPERATIONS ---
+  const handleAddTable = async () => {
+      if (!newTableName.trim()) return alert("Enter table name");
+      try {
+          await addDoc(collection(db, "tables"), { 
+              name: newTableName, 
+              status: "Available", 
+              guests: 0,
+              createdAt: serverTimestamp() // Helps with sorting stability if needed later
+          });
+          setNewTableName('');
+          setIsAddingTable(false);
+      } catch (e) { console.error(e); alert("Failed to add table"); }
+  };
+
+  const handleRenameTable = async () => {
+      const newName = prompt("Enter new name for this table:", selectedTable.name);
+      if (newName && newName !== selectedTable.name) {
+          try {
+              await updateDoc(doc(db, "tables", selectedTable.id), { name: newName });
+              setSelectedTable(null); 
+          } catch (e) { console.error(e); alert("Failed to rename"); }
+      }
+  };
+
+  const handleDeleteTable = async () => {
+      if (window.confirm(`Are you sure you want to DELETE ${selectedTable.name}? This cannot be undone.`)) {
+          try {
+              await deleteDoc(doc(db, "tables", selectedTable.id));
+              setSelectedTable(null);
+          } catch (e) { console.error(e); alert("Failed to delete"); }
+      }
+  };
 
   // --- HANDLE CLICKING A TABLE ---
   const handleTableClick = (table) => {
@@ -118,12 +199,10 @@ const TableManagement = () => {
     setShowKhaltiQR(false);
     setPaymentSuccessData(null);
 
-    // Filter orders for just this table for the modal view
     const specificOrders = activeOrders.filter(o => o.tableId === table.name);
     specificOrders.sort((a, b) => b.createdAt - a.createdAt);
     setCurrentTableOrders(specificOrders);
     
-    // Calculate total immediately
     const total = specificOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
     setGrandTotal(total);
   };
@@ -132,20 +211,33 @@ const TableManagement = () => {
   const handleOccupy = async () => { 
     try { await updateDoc(doc(db, "tables", selectedTable.id), { status: "Occupied", guests: 4 }); } catch (e) { console.error(e); }
   };
+  
   const handleReserve = async () => { 
-    const name = prompt("Enter Guest Name for Reservation:"); if(!name) return;
-    try { await updateDoc(doc(db, "tables", selectedTable.id), { status: "Reserved", reservedBy: name }); setSelectedTable(null); } catch (e) { console.error(e); }
+    const name = prompt("Enter Guest Name:"); 
+    if(!name) return;
+    
+    const time = prompt("Enter Arrival Time (e.g. 7:30 PM):");
+    if(!time) return;
+
+    try { 
+        await updateDoc(doc(db, "tables", selectedTable.id), { 
+            status: "Reserved", 
+            reservedBy: name,
+            arrivalTime: time // Saved for search and auto-release
+        }); 
+        setSelectedTable(null); 
+    } catch (e) { console.error(e); }
   };
+  
   const handleCleanTable = async () => { 
     if(!window.confirm("Table cleaned?")) return;
-    try { await updateDoc(doc(db, "tables", selectedTable.id), { status: "Available", guests: 0, reservedBy: null }); setSelectedTable(null); } catch (e) { console.error(e); }
+    try { await updateDoc(doc(db, "tables", selectedTable.id), { status: "Available", guests: 0, reservedBy: null, arrivalTime: null }); setSelectedTable(null); } catch (e) { console.error(e); }
   };
 
   // --- PAYMENT ---
   const handleProcessPayment = async (method = paymentMethod, khaltiPayload = null) => {
     if (currentTableOrders.length === 0) return;
     
-    // VALIDATION: Ensure all items are served
     const unservedOrders = currentTableOrders.filter(o => o.status !== 'COMPLETED');
     if (unservedOrders.length > 0) {
         return alert(`Cannot generate bill! ${unservedOrders.length} order(s) are still in the Kitchen (Not Served).`);
@@ -171,7 +263,7 @@ const TableManagement = () => {
         batch.update(doc(db, "orders", order.id), { status: "PAID" });
       });
 
-      batch.update(doc(db, "tables", selectedTable.id), { status: "Billed", reservedBy: null });
+      batch.update(doc(db, "tables", selectedTable.id), { status: "Billed", reservedBy: null, arrivalTime: null });
 
       await batch.commit();
 
@@ -221,19 +313,43 @@ const TableManagement = () => {
         {/* SEO META TAGS */}
         <Helmet>
             <title>Table Dashboard | RMS</title>
-            <meta name="description" content="Real-time table tracking, reservations, and billing status." />
+            <meta name="description" content={`Manage ${tables.length} tables. Check reservations and arrival times.`} />
         </Helmet>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '20px' }}>
-            <div style={{ display: 'flex', alignItems: 'center' }}>
-                <button onClick={() => navigate('/')} style={{ marginRight: '20px', padding: '10px 15px', border: '1px solid #ccc', background: 'white', borderRadius: '6px', cursor: 'pointer' }}>Back</button>
-                <h1 style={{margin:0}}>Table Management</h1>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{display:'flex', alignItems:'center'}}>
+                    <button onClick={() => navigate('/')} style={{ marginRight: '20px', padding: '10px 15px', border: '1px solid #ccc', background: 'white', borderRadius: '6px', cursor: 'pointer' }}>Back</button>
+                    <h1 style={{margin:0}}>Table Management</h1>
+                </div>
+                
+                {/* ADD TABLE TOGGLE */}
+                <button 
+                    onClick={() => setIsAddingTable(!isAddingTable)} 
+                    style={{ padding: '10px 15px', backgroundColor: '#333', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight:'bold' }}
+                >
+                    {isAddingTable ? "✕ Cancel" : "+ Add Table"}
+                </button>
             </div>
             
-            {/* SEARCH BAR FOR FILTERING */}
+            {/* ADD TABLE FORM */}
+            {isAddingTable && (
+                <div style={{ padding: '15px', backgroundColor: '#f0f0f0', borderRadius: '8px', display: 'flex', gap: '10px' }}>
+                    <input 
+                        type="text" 
+                        placeholder="Enter Table Name (e.g. T-10)" 
+                        value={newTableName} 
+                        onChange={(e) => setNewTableName(e.target.value)}
+                        style={{ flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid #ddd' }}
+                    />
+                    <button onClick={handleAddTable} style={{ padding: '10px 20px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Save</button>
+                </div>
+            )}
+
+            {/* SEARCH BAR (Includes Time Search) */}
             <input 
                 type="text" 
-                placeholder="Search by Table, Reservation Name, or Ordered Item..." 
+                placeholder="Search by Table, Guest, Arrival Time (e.g. 7:30), or Item..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
@@ -265,10 +381,15 @@ const TableManagement = () => {
                       <h3 style={{ margin: '0 0 5px 0', fontSize: '1.4rem' }}>{table.name}</h3>
                       <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', backgroundColor: getStatusColor(table.status), color: 'white', fontWeight: 'bold' }}>{table.status}</span>
                       
-                      {/* --- SEO/VISIBILITY: SHOW RESERVATION NAME --- */}
+                      {/* --- SHOW RESERVATION & ARRIVAL TIME --- */}
                       {table.status === 'Reserved' && table.reservedBy && (
-                          <div style={{ marginTop: '8px', fontSize: '0.9rem', color: '#E65100', fontWeight: 'bold', borderTop: '1px dashed #FFC107', paddingTop: '5px' }}>
-                              Reserved by: {table.reservedBy}
+                          <div style={{ marginTop: '10px', borderTop: '1px dashed #FFC107', paddingTop: '8px' }}>
+                              <div style={{ fontSize: '0.9rem', color: '#E65100', fontWeight: 'bold' }}>{table.reservedBy}</div>
+                              {table.arrivalTime && (
+                                  <div style={{ fontSize: '0.8rem', color: '#555', marginTop:'2px' }}>
+                                      🕒 Arriving: <strong>{table.arrivalTime}</strong>
+                                  </div>
+                              )}
                           </div>
                       )}
                   </div>
@@ -313,11 +434,10 @@ const TableManagement = () => {
                   </div>
               ) : (
                   <>
-                      {/* MODAL HEADER WITH STATUS */}
+                      {/* MODAL HEADER */}
                       <div style={{ borderBottom: '1px solid #eee', paddingBottom: '15px', marginBottom: '20px' }}>
                           <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                               <h2 style={{ margin: 0 }}>{selectedTable.name}</h2>
-                              {/* Show status in modal header too */}
                               {getTableData(selectedTable.name).status && (
                                   <span style={{
                                       fontSize:'0.8rem', fontWeight:'bold', 
@@ -330,15 +450,27 @@ const TableManagement = () => {
                           </div>
                           <p style={{ margin: '5px 0 0 0', color: '#666' }}>Status: <strong style={{color: getStatusColor(selectedTable.status)}}>{selectedTable.status}</strong></p>
                           
-                          {/* SHOW RESERVATION IN MODAL */}
-                          {selectedTable.status === 'Reserved' && selectedTable.reservedBy && (
-                              <p style={{ margin: '5px 0 0 0', color: '#FF9800', fontWeight: 'bold' }}>Guest: {selectedTable.reservedBy}</p>
+                          {/* SHOW RESERVATION DETAIL IN MODAL */}
+                          {selectedTable.status === 'Reserved' && (
+                              <div style={{marginTop:'10px', background:'#FFF3E0', padding:'10px', borderRadius:'6px'}}>
+                                  <div style={{fontWeight:'bold', color:'#E65100'}}>Guest: {selectedTable.reservedBy}</div>
+                                  {selectedTable.arrivalTime && <div style={{fontSize:'0.9rem', color:'#555'}}>🕒 Arrival: {selectedTable.arrivalTime}</div>}
+                              </div>
                           )}
                       </div>
 
                       {/* ACTIONS VIEW */}
                       {viewMode === 'ACTIONS' && (
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              
+                              {/* --- TABLE MODIFICATION (Only if Available) --- */}
+                              {selectedTable.status === 'Available' && (
+                                  <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
+                                      <button onClick={handleRenameTable} style={{ flex: 1, padding: '8px', background: '#f0f0f0', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer' }}>✏️ Rename</button>
+                                      <button onClick={handleDeleteTable} style={{ flex: 1, padding: '8px', background: '#FFEBEE', color: '#D32F2F', border: '1px solid #FFCDD2', borderRadius: '4px', cursor: 'pointer' }}>🗑️ Delete</button>
+                                  </div>
+                              )}
+
                               {currentTableOrders.length > 0 && (
                                   <div style={{background:'#fafafa', padding:'10px', borderRadius:'6px', marginBottom:'10px', border:'1px dashed #ccc'}}>
                                       <div style={{fontSize:'0.9rem', color:'#666'}}>Current Bill:</div>
@@ -349,7 +481,7 @@ const TableManagement = () => {
                               {selectedTable.status === 'Available' && (
                                   <>
                                       <button onClick={handleOccupy} style={btnStyle('#4CAF50')}>Seat Guests</button>
-                                      <button onClick={handleReserve} style={btnStyle('#FF9800')}>Reserve</button>
+                                      <button onClick={handleReserve} style={btnStyle('#FF9800')}>Reserve Table</button>
                                   </>
                               )}
                               {selectedTable.status === 'Occupied' && (
