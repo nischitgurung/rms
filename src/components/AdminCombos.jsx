@@ -26,16 +26,17 @@ const AdminCombos = () => {
   // Filter
   const [filterText, setFilterText] = useState('');
 
-  // Form Data (Added SEO Fields)
+  // Form Data (Added discountPercent)
   const [formData, setFormData] = useState({
     name: '', 
     price: '', 
+    discountPercent: '', // NEW: To bind the input
     description: '', 
     comboItems: [], 
     isAvailable: true,
-    seoTitle: '',        // NEW: For Search Aliases
-    seoDescription: '',  // NEW: To list contents for search
-    slug: ''             // NEW: For URL
+    seoTitle: '',        
+    seoDescription: '',  
+    slug: ''             
   });
 
   // --- 1. DATA FETCHING ---
@@ -75,12 +76,74 @@ const AdminCombos = () => {
       setStats({ total, active, avgPrice });
   };
 
+  // --- LOGIC: Calculate Total Value of Items in Form ---
+  const getCurrentBundleRealTotal = (items = formData.comboItems) => {
+      let total = 0;
+      items.forEach(cItem => {
+          const original = menuItems.find(i => i.id === cItem.id);
+          if (original) total += (parseFloat(original.price) || 0) * cItem.qty;
+      });
+      return total;
+  };
+
+  // --- HANDLER: User changes Price -> Calc Discount % ---
+  const handlePriceChange = (val) => {
+      const newPrice = parseFloat(val) || 0;
+      const realTotal = getCurrentBundleRealTotal();
+      
+      let newDiscount = 0;
+      if (realTotal > 0 && newPrice < realTotal) {
+          newDiscount = ((realTotal - newPrice) / realTotal) * 100;
+      }
+      
+      setFormData(prev => ({ 
+          ...prev, 
+          price: val, 
+          discountPercent: Math.round(newDiscount) 
+      }));
+  };
+
+  // --- HANDLER: User changes Discount % -> Calc Price ---
+  const handleDiscountChange = (val) => {
+      const discount = parseFloat(val) || 0;
+      const realTotal = getCurrentBundleRealTotal();
+      
+      const reduction = realTotal * (discount / 100);
+      const newPrice = Math.max(0, Math.round(realTotal - reduction));
+
+      setFormData(prev => ({ 
+          ...prev, 
+          discountPercent: val, 
+          price: newPrice 
+      }));
+  };
+
+  // --- HELPER: Get Discount Info for Display (Table Cards) ---
+  const getDiscountInfo = (comboItems, comboPrice) => {
+      let actualTotal = 0;
+      if(comboItems && Array.isArray(comboItems)){
+          comboItems.forEach(cItem => {
+              const originalItem = menuItems.find(i => i.id === cItem.id);
+              if(originalItem){
+                  actualTotal += (parseFloat(originalItem.price) || 0) * cItem.qty;
+              }
+          });
+      }
+      const price = parseFloat(comboPrice) || 0;
+      const savings = actualTotal - price;
+      const percent = actualTotal > 0 ? Math.round((savings / actualTotal) * 100) : 0;
+      return { actualTotal, percent, isSaving: savings > 0 };
+  };
+
   const getContentsDisplay = (comboItems) => {
       if (!comboItems || comboItems.length === 0) return "No items";
-      if (typeof comboItems[0] === 'string') return "Legacy Format (Edit to fix)";
       return comboItems.map(i => `${i.qty}x ${i.name}`).join(', ');
   };
 
+  // --- ITEM MANAGEMENT HANDLERS ---
+  // Note: When items change, we keep the price static but recalculate the discount %
+  // (Or you could choose to keep discount static and update price - currently keeping price static is safer)
+  
   const handleAddItem = (item) => {
       setFormData(prev => {
           const existing = prev.comboItems.find(i => i.id === item.id);
@@ -90,7 +153,13 @@ const AdminCombos = () => {
           } else {
               newItems = [...prev.comboItems, { id: item.id, name: item.name, qty: 1 }];
           }
-          return { ...prev, comboItems: newItems };
+          
+          // Re-calc discount based on new total and existing price
+          const newTotal = getCurrentBundleRealTotal(newItems);
+          const currentPrice = parseFloat(prev.price) || 0;
+          const newDiscount = newTotal > 0 ? Math.round(((newTotal - currentPrice) / newTotal) * 100) : 0;
+
+          return { ...prev, comboItems: newItems, discountPercent: newDiscount };
       });
   };
 
@@ -104,19 +173,35 @@ const AdminCombos = () => {
           } else {
               newItems = prev.comboItems.filter(i => i.id !== itemId);
           }
-          return { ...prev, comboItems: newItems };
+
+          const newTotal = getCurrentBundleRealTotal(newItems);
+          const currentPrice = parseFloat(prev.price) || 0;
+          const newDiscount = newTotal > 0 ? Math.round(((newTotal - currentPrice) / newTotal) * 100) : 0;
+
+          return { ...prev, comboItems: newItems, discountPercent: newDiscount };
       });
   };
 
   const handleRemoveItemCompletely = (itemId) => {
-      setFormData(prev => ({ ...prev, comboItems: prev.comboItems.filter(i => i.id !== itemId) }));
+      setFormData(prev => {
+          const newItems = prev.comboItems.filter(i => i.id !== itemId);
+          const newTotal = getCurrentBundleRealTotal(newItems);
+          const currentPrice = parseFloat(prev.price) || 0;
+          const newDiscount = newTotal > 0 ? Math.round(((newTotal - currentPrice) / newTotal) * 100) : 0;
+          return { ...prev, comboItems: newItems, discountPercent: newDiscount };
+      });
   };
 
   const handleEditClick = (combo) => {
       let formattedItems = combo.comboItems || [];
+      
+      // Calculate initial discount percent for the form
+      const { percent } = getDiscountInfo(formattedItems, combo.price);
+
       setFormData({
           name: combo.name,
           price: combo.price,
+          discountPercent: percent, // Pre-fill percentage
           description: combo.description || '',
           comboItems: formattedItems,
           isAvailable: combo.isAvailable,
@@ -135,8 +220,6 @@ const AdminCombos = () => {
     if (formData.comboItems.length === 0) return alert("Please select items.");
 
     try {
-        // AUTO-GENERATE SEO DESCRIPTION IF EMPTY
-        // This ensures that searching for "Burger" finds the "Family Feast" combo
         let autoSeoDesc = formData.seoDescription;
         if (!autoSeoDesc) {
             const contents = formData.comboItems.map(i => `${i.qty}x ${i.name}`).join(', ');
@@ -152,7 +235,6 @@ const AdminCombos = () => {
             comboItems: formData.comboItems,
             isAvailable: formData.isAvailable,
             itemIds: flatIds,
-            // SEO DATA
             seoTitle: formData.seoTitle || formData.name,
             seoDescription: autoSeoDesc,
             slug: formData.slug || generateSlug(formData.name),
@@ -167,7 +249,8 @@ const AdminCombos = () => {
             await addDoc(collection(db, "combos"), payload);
             alert("Combo Created!");
         }
-        setFormData({ name: '', price: '', description: '', comboItems: [], isAvailable: true, seoTitle: '', seoDescription: '', slug: '' });
+        // Reset form
+        setFormData({ name: '', price: '', discountPercent: '', description: '', comboItems: [], isAvailable: true, seoTitle: '', seoDescription: '', slug: '' });
         setEditingId(null);
         setShowForm(false);
     } catch (error) {
@@ -184,6 +267,9 @@ const AdminCombos = () => {
 
   const filteredCombos = combos.filter(c => c.name.toLowerCase().includes(filterText.toLowerCase()));
 
+  // Live total for display in form
+  const currentFormRealTotal = getCurrentBundleRealTotal();
+
   if (loading) return <div style={{padding:'40px', textAlign:'center'}}>Loading Combos...</div>;
 
   return (
@@ -199,7 +285,7 @@ const AdminCombos = () => {
         <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto' }}>
             <button onClick={() => navigate('/')} style={{ flex: 1, padding: '10px', border: '1px solid #ccc', background: 'white', borderRadius: '6px' }}>Back</button>
             <button 
-              onClick={() => { setShowForm(!showForm); setEditingId(null); setFormData({ name: '', price: '', description: '', comboItems: [], isAvailable: true, seoTitle: '', seoDescription: '', slug: '' }); }} 
+              onClick={() => { setShowForm(!showForm); setEditingId(null); setFormData({ name: '', price: '', discountPercent: '', description: '', comboItems: [], isAvailable: true, seoTitle: '', seoDescription: '', slug: '' }); }} 
               style={{ flex: 2, padding: '10px', backgroundColor: 'black', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold' }}
             >
               {showForm ? "✕ Close" : "+ Add Combo"}
@@ -229,15 +315,27 @@ const AdminCombos = () => {
           <h3 style={{marginTop:0, fontSize: '1.1rem'}}>{editingId ? "Edit Combo" : "Create New Combo"}</h3>
           <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '15px' }}>
             
-            <div style={{display:'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap:'15px'}}>
+            <div style={{display:'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr 1fr', gap:'15px'}}>
                 <div>
                     <label style={styles.label}>Combo Name</label>
                     <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value, slug: generateSlug(e.target.value)})} style={styles.input} placeholder="e.g. Family Feast" />
                 </div>
+                
+                {/* DYNAMIC PRICING SECTION */}
                 <div>
-                    <label style={styles.label}>Price (Rs.)</label>
-                    <input type="number" required value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} style={styles.input} />
+                    <label style={styles.label}>Deal Price (Rs.)</label>
+                    <input type="number" required value={formData.price} onChange={e => handlePriceChange(e.target.value)} style={{...styles.input, fontWeight:'bold', color:'#2c3e50'}} />
                 </div>
+                <div>
+                    <label style={styles.label}>Discount %</label>
+                    <input type="number" value={formData.discountPercent} onChange={e => handleDiscountChange(e.target.value)} style={{...styles.input, color:'green'}} placeholder="0" />
+                </div>
+            </div>
+
+            {/* LIVE CALCULATION DISPLAY */}
+            <div style={{backgroundColor:'#f0f4f8', padding:'10px', borderRadius:'6px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                <span style={{fontSize:'0.9rem', color:'#555'}}>Actual Value of Items:</span>
+                <span style={{fontWeight:'bold', textDecoration:'line-through', color:'#888'}}>Rs. {currentFormRealTotal}</span>
             </div>
 
             {/* SELECTION AREA */}
@@ -269,7 +367,10 @@ const AdminCombos = () => {
                         {menuItems.map(item => (
                             <div key={item.id} onClick={() => handleAddItem(item)} style={{ padding: '12px', borderBottom: '1px solid #eee', display:'flex', justifyContent:'space-between', cursor: 'pointer' }}>
                                 <span style={{fontSize: '0.9rem'}}>{item.name}</span>
-                                <span style={{fontSize:'0.8rem', color:'#4CAF50', fontWeight:'bold'}}>+ Add</span>
+                                <div>
+                                    <span style={{fontSize:'0.75rem', color:'#888', marginRight:'8px'}}>Rs.{item.price}</span>
+                                    <span style={{fontSize:'0.8rem', color:'#4CAF50', fontWeight:'bold'}}>+ Add</span>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -317,21 +418,30 @@ const AdminCombos = () => {
       {/* DATA VIEW */}
       {isMobile ? (
           <div style={{ display: 'grid', gap: '15px' }}>
-              {filteredCombos.map((combo) => (
-                <div key={combo.id} style={{ backgroundColor: 'white', padding: '15px', borderRadius: '12px', border: '1px solid #eee', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                        <div style={{fontWeight:'bold', fontSize:'1rem'}}>{combo.name}</div>
-                        <span style={{ fontWeight:'bold', color: '#4CAF50' }}>Rs. {combo.price}</span>
+              {filteredCombos.map((combo) => {
+                const { actualTotal, percent, isSaving } = getDiscountInfo(combo.comboItems, combo.price);
+                return (
+                    <div key={combo.id} style={{ backgroundColor: 'white', padding: '15px', borderRadius: '12px', border: '1px solid #eee', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <div style={{fontWeight:'bold', fontSize:'1rem'}}>{combo.name}</div>
+                            <div style={{textAlign:'right'}}>
+                                <span style={{ fontWeight:'bold', color: '#4CAF50', fontSize:'1.1rem' }}>Rs. {combo.price}</span>
+                                {isSaving && <div style={{fontSize:'0.75rem', color:'white', background:'#4CAF50', padding:'2px 6px', borderRadius:'4px', marginTop:'2px'}}>{percent}% OFF</div>}
+                            </div>
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '5px' }}>
+                            Actual Value: <span style={{textDecoration:'line-through'}}>Rs. {actualTotal}</span>
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '15px', lineHeight: '1.4' }}>
+                            <strong>Includes:</strong> {getContentsDisplay(combo.comboItems)}
+                        </div>
+                        <div style={{display:'flex', gap:'10px'}}>
+                            <button onClick={() => handleEditClick(combo)} style={{flex:1, padding:'10px', background:'#E3F2FD', color:'#1976D2', border:'none', borderRadius:'6px', fontWeight:'bold'}}>Edit</button>
+                            <button onClick={() => handleDelete(combo.id)} style={{flex:1, padding:'10px', background:'#FFEBEE', color:'#D32F2F', border:'none', borderRadius:'6px', fontWeight:'bold'}}>Delete</button>
+                        </div>
                     </div>
-                    <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '15px', lineHeight: '1.4' }}>
-                        <strong>Includes:</strong> {getContentsDisplay(combo.comboItems)}
-                    </div>
-                    <div style={{display:'flex', gap:'10px'}}>
-                        <button onClick={() => handleEditClick(combo)} style={{flex:1, padding:'10px', background:'#E3F2FD', color:'#1976D2', border:'none', borderRadius:'6px', fontWeight:'bold'}}>Edit</button>
-                        <button onClick={() => handleDelete(combo.id)} style={{flex:1, padding:'10px', background:'#FFEBEE', color:'#D32F2F', border:'none', borderRadius:'6px', fontWeight:'bold'}}>Delete</button>
-                    </div>
-                </div>
-              ))}
+                );
+              })}
           </div>
       ) : (
           <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
@@ -339,25 +449,39 @@ const AdminCombos = () => {
                 <thead style={{ backgroundColor: '#f9f9f9', borderBottom: '1px solid #eee' }}>
                   <tr>
                     <th style={styles.th}>Combo Name</th>
-                    <th style={styles.th}>Contents (Searchable)</th>
-                    <th style={styles.th}>Price</th>
+                    <th style={styles.th}>Contents</th>
+                    <th style={styles.th}>Deal Price (Value)</th>
+                    <th style={styles.th}>Discount</th>
                     <th style={styles.th}>Status</th>
                     <th style={styles.th}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredCombos.map((combo) => (
-                    <tr key={combo.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                      <td style={styles.td}><span style={{fontWeight:'bold'}}>{combo.name}</span></td>
-                      <td style={{...styles.td, fontSize: '0.85rem', color: '#666', maxWidth: '300px'}}>{getContentsDisplay(combo.comboItems)}</td>
-                      <td style={styles.td}>Rs. {combo.price}</td>
-                      <td style={styles.td}>{combo.isAvailable ? <span style={{color:'green', fontWeight:'bold'}}>Active</span> : <span style={{color:'red'}}>Inactive</span>}</td>
-                      <td style={styles.td}>
-                          <button onClick={() => handleEditClick(combo)} style={{marginRight:'10px', padding:'6px 12px', background:'#E3F2FD', color:'#1976D2', border:'none', borderRadius:'4px', cursor:'pointer', fontWeight:'bold'}}>Edit</button>
-                          <button onClick={() => handleDelete(combo.id)} style={{padding:'6px 12px', background:'#FFEBEE', color:'#D32F2F', border:'none', borderRadius:'4px', cursor:'pointer', fontWeight:'bold'}}>Delete</button>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredCombos.map((combo) => {
+                    const { actualTotal, percent, isSaving } = getDiscountInfo(combo.comboItems, combo.price);
+                    return (
+                        <tr key={combo.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                        <td style={styles.td}><span style={{fontWeight:'bold'}}>{combo.name}</span></td>
+                        <td style={{...styles.td, fontSize: '0.85rem', color: '#666', maxWidth: '300px'}}>{getContentsDisplay(combo.comboItems)}</td>
+                        <td style={styles.td}>
+                            <span style={{fontWeight:'bold', color:'#2c3e50', fontSize:'1rem'}}>Rs. {combo.price}</span>
+                            <div style={{fontSize:'0.75rem', color:'#999', textDecoration:'line-through'}}>Real: Rs. {actualTotal}</div>
+                        </td>
+                        <td style={styles.td}>
+                            {isSaving ? (
+                                <span style={{backgroundColor:'#E8F5E9', color:'#2E7D32', padding:'4px 8px', borderRadius:'12px', fontSize:'0.75rem', fontWeight:'bold'}}>{percent}% OFF</span>
+                            ) : (
+                                <span style={{color:'#999', fontSize:'0.8rem'}}>None</span>
+                            )}
+                        </td>
+                        <td style={styles.td}>{combo.isAvailable ? <span style={{color:'green', fontWeight:'bold'}}>Active</span> : <span style={{color:'red'}}>Inactive</span>}</td>
+                        <td style={styles.td}>
+                            <button onClick={() => handleEditClick(combo)} style={{marginRight:'10px', padding:'6px 12px', background:'#E3F2FD', color:'#1976D2', border:'none', borderRadius:'4px', cursor:'pointer', fontWeight:'bold'}}>Edit</button>
+                            <button onClick={() => handleDelete(combo.id)} style={{padding:'6px 12px', background:'#FFEBEE', color:'#D32F2F', border:'none', borderRadius:'4px', cursor:'pointer', fontWeight:'bold'}}>Delete</button>
+                        </td>
+                        </tr>
+                    );
+                  })}
                 </tbody>
               </table>
           </div>
