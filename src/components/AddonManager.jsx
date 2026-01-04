@@ -17,11 +17,15 @@ const AddonManager = () => {
         name: '',
         price: '',
         isAvailable: true,
-        recipe: [] // Array of { stockId, name, qty, unit }
+        recipe: [], // Array of { stockId, name, qty, unit }
+        // SEO Strategy Fields
+        seoTitle: '',
+        seoDescription: ''
     });
 
     // Temp state for adding ingredient to the add-on
     const [ingForm, setIngForm] = useState({ stockId: '', qty: '' });
+    const [ingSearch, setIngSearch] = useState(''); // ADDED: For searching materials by Alias
 
     // --- 1. DATA FETCHING ---
     useEffect(() => {
@@ -63,6 +67,7 @@ const AddonManager = () => {
             recipe: [...prev.recipe, newEntry]
         }));
         setIngForm({ stockId: '', qty: '' });
+        setIngSearch('');
     };
 
     const removeIngredientFromRecipe = (index) => {
@@ -81,7 +86,10 @@ const AddonManager = () => {
             name: formData.name,
             price: parseFloat(formData.price),
             isAvailable: formData.isAvailable,
-            recipe: formData.recipe, // This makes the impact on inventory
+            recipe: formData.recipe, 
+            // Save SEO Fields
+            seoTitle: formData.seoTitle || formData.name,
+            seoDescription: formData.seoDescription || '',
             updatedAt: serverTimestamp()
         };
 
@@ -105,14 +113,16 @@ const AddonManager = () => {
             name: item.name,
             price: item.price,
             isAvailable: item.isAvailable ?? true,
-            recipe: item.recipe || []
+            recipe: item.recipe || [],
+            seoTitle: item.seoTitle || '',
+            seoDescription: item.seoDescription || ''
         });
         setEditingId(item.id);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
     const handleCancelEdit = () => {
-        setFormData({ name: '', price: '', isAvailable: true, recipe: [] });
+        setFormData({ name: '', price: '', isAvailable: true, recipe: [], seoTitle: '', seoDescription: '' });
         setEditingId(null);
     };
 
@@ -121,6 +131,12 @@ const AddonManager = () => {
             await deleteDoc(doc(db, "modifiers", id));
         }
     };
+
+    // Filter stock items by Alias or Name
+    const filteredStock = stockItems.filter(s => 
+        s.itemName?.toLowerCase().includes(ingSearch.toLowerCase()) || 
+        s.seoTitle?.toLowerCase().includes(ingSearch.toLowerCase())
+    );
 
     if (loading) return <div style={{ padding: '40px', textAlign: 'center' }}>Loading...</div>;
 
@@ -145,13 +161,41 @@ const AddonManager = () => {
                         <input type="number" placeholder="Price" value={formData.price} onChange={e => setFormData({ ...formData, price: e.target.value })} style={styles.input} required />
                     </div>
 
+                    {/* ADDED: SEO UPSELL PANEL */}
+                    <div style={styles.seoBox}>
+                        <h4 style={{marginTop:0, color:'#d32f2f', fontSize:'0.85rem'}}>🚀 UPSELL OPTIMIZATION</h4>
+                        <div style={{display:'grid', gap:'10px'}}>
+                            <input 
+                                placeholder="Upsell Alias (Short Code for Staff)" 
+                                value={formData.seoTitle} 
+                                onChange={e => setFormData({...formData, seoTitle: e.target.value})} 
+                                style={styles.miniInput} 
+                            />
+                            <textarea 
+                                placeholder="Staff Upsell Script (e.g. 'Highly recommended with Spicy Burgers!')" 
+                                value={formData.seoDescription} 
+                                onChange={e => setFormData({...formData, seoDescription: e.target.value})} 
+                                style={{...styles.miniInput, height:'50px'}} 
+                            />
+                        </div>
+                    </div>
+
                     {/* INVENTORY MAPPING SECTION */}
                     <div style={{ backgroundColor: '#f9f9f9', padding: '15px', borderRadius: '8px', marginBottom: '15px', border: '1px dashed #ccc' }}>
                         <h4 style={{ marginTop: 0, fontSize: '0.9rem' }}>📦 Inventory Impact (Recipes)</h4>
+                        
+                        {/* Material Search */}
+                        <input 
+                            placeholder="Find material by alias..." 
+                            value={ingSearch} 
+                            onChange={e => setIngSearch(e.target.value)} 
+                            style={{...styles.input, marginBottom:'10px', height:'35px', fontSize:'0.8rem'}} 
+                        />
+
                         <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
                             <select value={ingForm.stockId} onChange={e => setIngForm({ ...ingForm, stockId: e.target.value })} style={{ ...styles.input, flex: 2 }}>
-                                <option value="">Select Material</option>
-                                {stockItems.map(s => <option key={s.id} value={s.id}>{s.itemName} ({s.unit})</option>)}
+                                <option value="">Select Material ({filteredStock.length} found)</option>
+                                {filteredStock.map(s => <option key={s.id} value={s.id}>{s.itemName} ({s.unit}) {s.seoTitle && `[${s.seoTitle}]`}</option>)}
                             </select>
                             <input type="number" placeholder="Qty" value={ingForm.qty} onChange={e => setIngForm({ ...ingForm, qty: e.target.value })} style={{ ...styles.input, flex: 1 }} />
                             <button type="button" onClick={addIngredientToRecipe} style={styles.addIngBtn}>Link</button>
@@ -183,6 +227,7 @@ const AddonManager = () => {
                             <span>{item.name}</span>
                             <span>Rs. {item.price}</span>
                         </div>
+                        {item.seoTitle && <div style={{fontSize:'0.7rem', color:'#888', marginTop:'5px'}}>Alias: {item.seoTitle}</div>}
                         <div style={{ margin: '10px 0', fontSize: '0.8rem', color: '#666' }}>
                             <strong>Stock Impact:</strong> {item.recipe?.length > 0 ? item.recipe.map(r => `${r.qty}${r.unit} ${r.name}`).join(', ') : 'None'}
                         </div>
@@ -200,13 +245,15 @@ const AddonManager = () => {
 const styles = {
     card: { backgroundColor: 'white', padding: '15px', borderRadius: '12px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', marginBottom: '20px' },
     input: { padding: '12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '1rem', width: '100%', boxSizing: 'border-box' },
+    miniInput: { padding: '8px', border: '1px solid #ddd', borderRadius: '4px', fontSize: '0.85rem', width: '100%', boxSizing: 'border-box' },
     backBtn: { padding: '10px 20px', border: '1px solid #ccc', background: 'white', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' },
     addIngBtn: { padding: '0 15px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' },
     recipeTag: { display: 'inline-block', backgroundColor: '#eee', padding: '5px 10px', borderRadius: '4px', marginRight: '5px', marginTop: '5px', fontSize: '0.85rem' },
     submitBtn: { flex: 1, padding: '15px', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' },
     cancelBtn: { padding: '15px', background: '#ccc', border: 'none', borderRadius: '6px', cursor: 'pointer' },
     editBtn: { flex: 1, padding: '8px', background: '#E3F2FD', color: '#1976D2', border: 'none', borderRadius: '4px', fontWeight: 'bold' },
-    deleteBtn: { flex: 1, padding: '8px', background: '#FFEBEE', color: '#D32F2F', border: 'none', borderRadius: '4px', fontWeight: 'bold' }
+    deleteBtn: { flex: 1, padding: '8px', background: '#FFEBEE', color: '#D32F2F', border: 'none', borderRadius: '4px', fontWeight: 'bold' },
+    seoBox: { backgroundColor: '#fff5f5', padding: '12px', borderRadius: '8px', border: '1px solid #ffcdd2', marginBottom: '15px' }
 };
 
 export default AddonManager;
