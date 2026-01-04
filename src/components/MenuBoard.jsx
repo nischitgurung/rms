@@ -15,22 +15,28 @@ import { Helmet, HelmetProvider } from 'react-helmet-async';
 
 // --- STYLES HELPER ---
 const styles = {
-  qtyBtn: { width:'32px', height:'32px', borderRadius:'8px', border:'1px solid #ddd', cursor:'pointer', background:'white', fontWeight:'bold', fontSize:'1.1rem', display:'flex', alignItems:'center', justifyContent:'center' },
-  catBtn: { padding: '8px 16px', borderRadius: '30px', border: '1px solid #eee', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: '600', fontSize: '0.85rem', transition: 'all 0.2s', boxShadow:'0 2px 5px rgba(0,0,0,0.05)' },
+  qtyBtn: { 
+    width:'32px', height:'32px', borderRadius:'8px', border:'1px solid #eee', cursor:'pointer', background:'white', 
+    fontWeight:'bold', fontSize:'1.1rem', display:'flex', alignItems:'center', justifyContent:'center', 
+    boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+  },
+  catBtn: { 
+    padding: '8px 16px', borderRadius: '20px', border: '1px solid #eee', cursor: 'pointer', whiteSpace: 'nowrap', 
+    fontWeight: '600', fontSize: '0.85rem', transition: 'all 0.2s', boxShadow:'0 1px 3px rgba(0,0,0,0.05)' 
+  },
   
-  // CARD STYLING
+  // OPTIMIZED CARD STYLING
   itemCard: { 
     backgroundColor: 'white', 
     borderRadius: '12px', 
     cursor: 'pointer', 
     border: 'none', 
-    boxShadow: '0 2px 8px rgba(0,0,0,0.06)', 
+    boxShadow: '0 3px 6px rgba(0,0,0,0.06)', 
     overflow: 'hidden', 
     display: 'flex',
     flexDirection: 'column',
     height: '100%', 
-    // minHeight is dynamic in component
-    transition: 'transform 0.2s, box-shadow 0.2s',
+    transition: 'transform 0.15s ease-in-out',
     boxSizing: 'border-box',
     position: 'relative'
   },
@@ -38,7 +44,7 @@ const styles = {
   // SINGLE IMAGE
   itemImage: {
     width: '100%',
-    // height is dynamic
+    // Height is dynamic based on device
     objectFit: 'cover', 
     backgroundColor: '#f8f9fa',
     flexShrink: 0
@@ -47,7 +53,7 @@ const styles = {
   // COMBO TEXT BOX (Replaces Image Grid)
   comboTextBox: {
     width: '100%',
-    // height is dynamic
+    // Height is dynamic based on device
     backgroundColor: '#E3F2FD', 
     color: '#1565C0',
     display: 'flex',
@@ -58,13 +64,13 @@ const styles = {
     boxSizing: 'border-box',
     flexShrink: 0,
     fontSize: '0.8rem',
-    fontWeight: '500',
+    fontWeight: '600',
     textAlign: 'center',
     lineHeight: '1.4'
   },
 
   itemInfo: {
-    padding: '10px',
+    padding: '10px 12px',
     textAlign: 'left',
     display: 'flex',
     flexDirection: 'column',
@@ -74,10 +80,10 @@ const styles = {
   },
   itemNameText: {
     margin: '0 0 4px 0', 
-    fontSize: '0.9rem', 
+    fontSize: '0.95rem', 
     fontWeight: '700',
-    lineHeight: '1.2em',
-    color: '#2c3e50',
+    lineHeight: '1.25em',
+    color: '#333',
     display: '-webkit-box',
     WebkitLineClamp: 2,
     WebkitBoxOrient: 'vertical',
@@ -87,21 +93,24 @@ const styles = {
     fontWeight: '800', 
     color: '#27ae60', 
     fontSize: '1rem',
-    marginTop: 'auto', // Pushes to bottom
+    marginTop: 'auto', 
     display: 'block'
   },
   
   // MODAL STYLING
-  modalOverlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, backdropFilter: 'blur(3px)' },
+  modalOverlay: { 
+    position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', 
+    display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, backdropFilter: 'blur(3px)' 
+  },
   modal: { 
     backgroundColor: 'white', 
     padding: '0', 
-    borderRadius: '20px', 
-    width: '420px', 
+    borderRadius: '16px', 
+    width: '400px', 
     maxWidth: '90%', 
     textAlign: 'center', 
     overflow: 'hidden', 
-    boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
     display: 'flex',       
     flexDirection: 'column' 
   },
@@ -113,29 +122,41 @@ const styles = {
     left: '8px',
     backgroundColor: '#FF9800',
     color: 'white',
-    padding: '2px 6px',
-    borderRadius: '8px',
+    padding: '3px 8px',
+    borderRadius: '6px',
     fontSize: '0.7rem',
     fontWeight: 'bold',
     zIndex: 10,
-    boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+    boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
   },
 
-  // FIX: RESTORED ORIGINAL BLACK BUTTON STYLE
+  // ORIGINAL BLACK BUTTON STYLE
   sendBtn: { 
     width: '100%', 
-    padding: '15px', 
-    backgroundColor: 'black', // Back to Black
+    padding: '16px', 
+    backgroundColor: 'black', 
     color: 'white', 
     border: 'none', 
     borderRadius: '10px', 
     cursor: 'pointer', 
     fontWeight: 'bold', 
     fontSize: '1rem', 
-    letterSpacing:'0.5px' 
+    letterSpacing:'0.5px',
+    boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
   },
 
-  searchInput: { width: '100%', padding: '10px 15px', borderRadius: '30px', border: '1px solid #ddd', marginBottom: '10px', fontSize: '0.95rem', outline: 'none', boxShadow:'inset 0 2px 5px rgba(0,0,0,0.02)' }
+  // FIX: Added boxSizing: 'border-box' so padding doesn't overflow width
+  searchInput: { 
+    width: '100%', 
+    padding: '12px 16px', 
+    borderRadius: '30px', 
+    border: '1px solid #ddd', 
+    marginBottom: '10px', 
+    fontSize: '0.95rem', 
+    outline: 'none', 
+    backgroundColor: '#f9f9f9',
+    boxSizing: 'border-box' 
+  }
 };
 
 // ==========================================
@@ -144,15 +165,15 @@ const styles = {
 const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, updateQty, removeItem, isMobile, detectedCombos, applyCombo }) => (
   <div style={{ 
     width: isMobile ? '100%' : '340px', 
-    height: isMobile ? 'calc(100vh - 60px)' : '100vh', // Subtract nav bar height
+    height: isMobile ? 'calc(100vh - 60px)' : '100vh', 
     backgroundColor: 'white', 
     borderRight: isMobile ? 'none' : '1px solid #eee', 
     display: 'flex', flexDirection: 'column' 
   }}>
-    <div style={{ padding: '20px', borderBottom: '1px solid #f0f0f0' }}>
-      <h2 style={{ margin: '0 0 5px 0', fontSize: '1.4rem', color: '#2c3e50' }}>Current Order</h2>
-      <div style={{ fontSize: '0.9rem', color: '#7f8c8d' }}>
-        Table: <strong style={{color:'#2c3e50'}}>{initialTableName === 'Walk-in' ? 'Unassigned' : initialTableName}</strong>
+    <div style={{ padding: '20px', borderBottom: '1px solid #eee' }}>
+      <h2 style={{ margin: '0 0 5px 0', fontSize: '1.3rem', color: '#111' }}>Current Order</h2>
+      <div style={{ fontSize: '0.9rem', color: '#666' }}>
+        Table: <strong style={{color:'#000'}}>{initialTableName === 'Walk-in' ? 'Unassigned' : initialTableName}</strong>
       </div>
     </div>
 
@@ -166,7 +187,7 @@ const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, upd
             </div>
             <button 
                 onClick={() => applyCombo(combo)} 
-                style={{ padding: '6px 10px', backgroundColor: '#1976D2', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight:'bold' }}
+                style={{ padding: '6px 12px', backgroundColor: '#1976D2', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight:'bold' }}
             >
                 Apply
             </button>
@@ -175,21 +196,21 @@ const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, upd
       </div>
     )}
     
-    <div style={{ flex: 1, overflowY: 'auto', padding: '15px', paddingBottom: '100px' /* Space for fixed footer */ }}>
-      {cart.length === 0 && <div style={{padding:'40px 20px', textAlign:'center', color:'#bdc3c7', fontStyle:'italic'}}>Cart is empty</div>}
+    <div style={{ flex: 1, overflowY: 'auto', padding: '15px', paddingBottom: isMobile ? '100px' : '20px' }}>
+      {cart.length === 0 && <div style={{padding:'40px 20px', textAlign:'center', color:'#ccc', fontStyle:'italic'}}>Cart is empty</div>}
       {cart.map((item) => (
         <div key={item.cartId} style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px dashed #eee' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom:'5px' }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: '600', color: '#2c3e50', fontSize:'0.9rem' }}>
+              <div style={{ fontWeight: '600', color: '#333', fontSize:'0.95rem' }}>
                 {item.isCombo ? '🎁 ' : ''}{item.name} 
-                <span style={{fontSize:'0.8rem', color:'#7f8c8d', marginLeft:'5px'}}>x{item.qty}</span>
+                <span style={{fontSize:'0.85rem', color:'#888', marginLeft:'5px'}}>x{item.qty}</span>
               </div>
               {item.selectedExtras?.map(ex => (
-                <div key={ex.id} style={{ fontSize: '0.75rem', color: '#95a5a6' }}>+ {ex.name}</div>
+                <div key={ex.id} style={{ fontSize: '0.8rem', color: '#666' }}>+ {ex.name}</div>
               ))}
             </div>
-            <div style={{ fontWeight: '700', color: '#2c3e50', marginLeft: '10px', fontSize:'0.9rem' }}>
+            <div style={{ fontWeight: '700', color: '#333', marginLeft: '10px', fontSize:'0.95rem' }}>
               Rs. {(item.price * item.qty).toFixed(0)}
             </div>
           </div>
@@ -203,18 +224,14 @@ const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, upd
       ))}
     </div>
 
-    {/* STICKY FOOTER FOR CART */}
     <div style={{ 
-        padding: '15px', 
+        padding: '20px', 
         backgroundColor: '#fff', 
         borderTop: '1px solid #eee', 
         position: isMobile ? 'absolute' : 'relative',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        zIndex: 10
+        bottom: 0, left: 0, right: 0, zIndex: 10
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '10px', color:'#2c3e50' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '15px', color:'#111' }}>
         <span>Total</span>
         <span>Rs. {cart.reduce((acc, item) => acc + (item.price * item.qty), 0).toFixed(2)}</span>
       </div>
@@ -241,26 +258,27 @@ const MenuView = ({ categories, activeCategory, setActiveCategory, items, handle
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: isMobile ? 'calc(100vh - 60px)' : '100vh', backgroundColor:'#f4f6f8' }}>
-      <div style={{ padding: isMobile ? '10px' : '20px', backgroundColor: 'white', borderBottom: '1px solid #eee' }}>
-        <input type="text" placeholder="🔍 Search..." style={styles.searchInput} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+      <div style={{ padding: isMobile ? '10px 15px' : '20px', backgroundColor: 'white', borderBottom: '1px solid #eee' }}>
+        <input type="text" placeholder="🔍 Search food..." style={styles.searchInput} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px', scrollbarWidth: 'none' }}>
-          <button onClick={() => setActiveCategory('All')} style={{ ...styles.catBtn, backgroundColor: activeCategory === 'All' ? '#2c3e50' : 'white', color: activeCategory === 'All' ? 'white' : '#2c3e50' }}>All</button>
+          <button onClick={() => setActiveCategory('All')} style={{ ...styles.catBtn, backgroundColor: activeCategory === 'All' ? '#111' : 'white', color: activeCategory === 'All' ? 'white' : '#111' }}>All</button>
           
           {categories.map(cat => (
-             <button key={cat.id} onClick={() => setActiveCategory(cat.id)} style={{ ...styles.catBtn, backgroundColor: activeCategory === cat.id ? '#2c3e50' : 'white', color: activeCategory === cat.id ? 'white' : '#2c3e50' }}>{cat.name}</button>
+             <button key={cat.id} onClick={() => setActiveCategory(cat.id)} style={{ ...styles.catBtn, backgroundColor: activeCategory === cat.id ? '#111' : 'white', color: activeCategory === cat.id ? 'white' : '#111' }}>{cat.name}</button>
           ))}
           
           <button onClick={() => setActiveCategory('Deals')} style={{ ...styles.catBtn, backgroundColor: activeCategory === 'Deals' ? '#E65100' : 'white', color: activeCategory === 'Deals' ? 'white' : '#E65100', border:'1px solid #E65100' }}>⭐ Deals</button>
         </div>
       </div>
       
-      {/* OPTIMIZED GRID FOR MOBILE */}
+      {/* OPTIMIZED GRID */}
       <div style={{ 
         flex: 1, 
         padding: isMobile ? '10px' : '20px', 
         overflowY: 'auto', 
         display: 'grid', 
-        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', 
+        // Mobile: 2 Columns | Desktop: Auto-fill minimum 220px
+        gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))', 
         gap: isMobile ? '10px' : '20px', 
         alignContent: 'start',
         paddingBottom: isMobile ? '80px' : '20px'
@@ -271,15 +289,15 @@ const MenuView = ({ categories, activeCategory, setActiveCategory, items, handle
             onClick={() => handleItemClick(item)} 
             style={{
                 ...styles.itemCard,
-                minHeight: isMobile ? '200px' : '260px' // Shorter cards on mobile
+                minHeight: isMobile ? '190px' : '250px' 
             }}
           >
             
             {item.isCombo && <div style={styles.comboBadge}>DEAL</div>}
 
-            {/* COMBO DISPLAY: TEXT ONLY, NO PICTURE */}
+            {/* COMBO: TEXT ONLY, NO PICTURE */}
             {item.isCombo ? (
-                <div style={{...styles.comboTextBox, height: isMobile ? '120px' : '160px'}}>
+                <div style={{...styles.comboTextBox, height: isMobile ? '110px' : '150px'}}>
                     {item.comboItems && item.comboItems.slice(0,4).map((sub, i) => (
                         <div key={i}>• {sub.qty}x {sub.name}</div>
                     ))}
@@ -289,7 +307,7 @@ const MenuView = ({ categories, activeCategory, setActiveCategory, items, handle
                 <img 
                   src={item.imageUrl || 'https://via.placeholder.com/300x200?text=No+Image'} 
                   alt={item.altText || item.name} 
-                  style={{...styles.itemImage, height: isMobile ? '120px' : '160px'}} 
+                  style={{...styles.itemImage, height: isMobile ? '110px' : '150px'}} 
                   loading="lazy"
                 />
             )}
@@ -324,7 +342,7 @@ const SidebarView = ({ navigate, isMobile }) => {
 
   return (
     <div style={{ width: isMobile ? '100%' : '240px', height: isMobile ? 'calc(100vh - 60px)' : '100vh', backgroundColor: '#f8f9fa', borderLeft: isMobile ? 'none' : '1px solid #ddd', padding: '15px', display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
-      <h3 style={{ margin: '0 0 20px 0', fontSize: '1rem', textTransform: 'uppercase', color: '#7f8c8d' }}>Options</h3>
+      <h3 style={{ margin: '0 0 20px 0', fontSize: '0.9rem', textTransform: 'uppercase', color: '#888', letterSpacing:'1px' }}>Management</h3>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         <button onClick={() => navigate('/tables')} style={{...sidebarBtn, backgroundColor: '#e3f2fd', color: '#1565C0'}}>🪑 Tables</button>
         {menuOptions.map((section) => (
@@ -381,27 +399,22 @@ const MenuBoard = () => {
 
     const fetchData = async () => {
       try {
-        // 1. Fetch Categories
         const catSnap = await getDocs(collection(db, "categories"));
         const fetchedCategories = catSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (a.sortOrder || 0) - (b.sortOrder || 0));
         setCategories(fetchedCategories);
 
-        // 2. Fetch Menu Items (Needed to map images to combos)
         const itemSnap = await getDocs(collection(db, "menu_items"));
         const fetchedMenuItems = itemSnap.docs.map(d => ({id: d.id, ...d.data()}));
         
-        // Create a quick lookup map for images: ID -> ImageURL
         const imageMap = {};
         fetchedMenuItems.forEach(i => { imageMap[i.id] = i.imageUrl; });
 
-        // 3. Fetch Combos & Enrich with Images
         const comboSnap = await getDocs(collection(db, "combos")); 
         const fetchedCombos = comboSnap.docs.map(d => {
             const data = d.data();
-            // Enrich contents with images
             const enrichedContents = (data.comboItems || []).map(ci => ({
                 ...ci,
-                imageUrl: imageMap[ci.id] || null // Map ID to URL
+                imageUrl: imageMap[ci.id] || null 
             }));
 
             return {
@@ -413,11 +426,9 @@ const MenuBoard = () => {
             };
         });
 
-        // 4. Merge All Items
         setItems([...fetchedMenuItems, ...fetchedCombos]); 
         setCombos(fetchedCombos); 
         
-        // 5. Modifiers
         const modSnap = await getDocs(collection(db, "modifiers"));
         setModifiers(modSnap.docs.map(d => ({id: d.id, ...d.data()})).filter(m => m.isAvailable)); 
         
@@ -476,7 +487,6 @@ const MenuBoard = () => {
     setShowTableSelector(false);
   };
 
-  // --- COMBO DETECTION LOGIC ---
   const checkAvailableCombos = () => {
       if (!combos || combos.length === 0 || cart.length === 0) return [];
       const detected = [];
