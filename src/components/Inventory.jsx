@@ -190,41 +190,85 @@ const Inventory = () => {
           <button onClick={() => setIsModalOpen(true)} style={{...styles.addBtn, padding: isMobile ? '15px' : '10px 20px'}}>{activeTab === 'STOCK' ? '+ Add Item' : '+ Add Supplier'}</button>
       </div>
 
-      {/* List/Table View */}
-      <div style={styles.tableContainer}>
-            <table style={styles.table}>
-                <thead>
-                    <tr style={{backgroundColor: '#f1f1f1'}}>
-                        <th style={styles.th}>{activeTab === 'STOCK' ? 'Item' : 'Supplier'}</th>
-                        <th style={styles.th}>{activeTab === 'STOCK' ? 'Qty' : 'Contact'}</th>
-                        <th style={styles.th}>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {filteredData.map(item => (
-                        <tr key={item.id} style={{ borderBottom: '1px solid #eee' }}>
-                            <td style={styles.td}>
-                                <div><strong>{activeTab === 'STOCK' ? item.itemName : item.name}</strong></div>
-                                {activeTab === 'STOCK' && item.seoTitle && item.seoTitle !== item.itemName && (
-                                    <div style={{fontSize: '0.7rem', color: '#888'}}>Alias: {item.seoTitle}</div>
-                                )}
-                            </td>
-                            <td style={styles.td}>
-                                {activeTab === 'STOCK' ? (
-                                    <span style={{ color: (item.quantity <= item.minStock) ? 'red' : 'inherit', fontWeight: (item.quantity <= item.minStock) ? 'bold' : 'normal' }}>
-                                        {item.quantity} {item.unit}
-                                    </span>
-                                ) : item.contact}
-                            </td>
-                            <td style={styles.td}>
-                                <button onClick={() => openEditModal(item, activeTab)} style={styles.editBtn}>Edit</button>
-                                <button onClick={() => handleDelete(item.id, activeTab)} style={styles.deleteBtn}>Delete</button>
-                            </td>
+      {/* DATA VIEW SWITCH: MOBILE CARDS vs DESKTOP TABLE */}
+      {isMobile ? (
+          /* MOBILE CARD LIST */
+          <div style={{ display: 'grid', gap: '10px' }}>
+              {filteredData.map(item => (
+                  <div key={item.id} style={styles.mobileCard}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                          <strong style={{ fontSize: '1rem' }}>{activeTab === 'STOCK' ? item.itemName : item.name}</strong>
+                          
+                          {activeTab === 'STOCK' && (
+                              <span style={{ 
+                                  color: (item.quantity <= item.minStock) ? 'red' : '#4CAF50', 
+                                  fontWeight: 'bold', 
+                                  fontSize: '0.9rem',
+                                  backgroundColor: (item.quantity <= item.minStock) ? '#FFEBEE' : '#E8F5E9',
+                                  padding: '2px 8px',
+                                  borderRadius: '4px'
+                              }}>
+                                  {item.quantity} {item.unit}
+                              </span>
+                          )}
+                      </div>
+                      
+                      {activeTab === 'STOCK' ? (
+                          <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '10px' }}>
+                              <div>Category: {item.category}</div>
+                              {item.seoTitle && <div>Alias: {item.seoTitle}</div>}
+                          </div>
+                      ) : (
+                          <div style={{ fontSize: '0.8rem', color: '#666', marginBottom: '10px' }}>
+                              <div>📞 {item.contact}</div>
+                              <div>📧 {item.email}</div>
+                          </div>
+                      )}
+
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                          <button onClick={() => openEditModal(item, activeTab)} style={{...styles.editBtn, flex:1, padding:'8px'}}>Edit</button>
+                          <button onClick={() => handleDelete(item.id, activeTab)} style={{...styles.deleteBtn, flex:1, padding:'8px'}}>Delete</button>
+                      </div>
+                  </div>
+              ))}
+          </div>
+      ) : (
+          /* DESKTOP TABLE VIEW */
+          <div style={styles.tableContainer}>
+                <table style={styles.table}>
+                    <thead>
+                        <tr style={{backgroundColor: '#f1f1f1'}}>
+                            <th style={styles.th}>{activeTab === 'STOCK' ? 'Item' : 'Supplier'}</th>
+                            <th style={styles.th}>{activeTab === 'STOCK' ? 'Qty' : 'Contact'}</th>
+                            <th style={styles.th}>Actions</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
-      </div>
+                    </thead>
+                    <tbody>
+                        {filteredData.map(item => (
+                            <tr key={item.id} style={{ borderBottom: '1px solid #eee' }}>
+                                <td style={styles.td}>
+                                    <div><strong>{activeTab === 'STOCK' ? item.itemName : item.name}</strong></div>
+                                    {activeTab === 'STOCK' && item.seoTitle && item.seoTitle !== item.itemName && (
+                                        <div style={{fontSize: '0.7rem', color: '#888'}}>Alias: {item.seoTitle}</div>
+                                    )}
+                                </td>
+                                <td style={styles.td}>
+                                    {activeTab === 'STOCK' ? (
+                                        <span style={{ color: (item.quantity <= item.minStock) ? 'red' : 'inherit', fontWeight: (item.quantity <= item.minStock) ? 'bold' : 'normal' }}>
+                                            {item.quantity} {item.unit}
+                                        </span>
+                                    ) : item.contact}
+                                </td>
+                                <td style={styles.td}>
+                                    <button onClick={() => openEditModal(item, activeTab)} style={styles.editBtn}>Edit</button>
+                                    <button onClick={() => handleDelete(item.id, activeTab)} style={styles.deleteBtn}>Delete</button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+          </div>
+      )}
 
       {/* MODAL WITH SEO CMS SECTION */}
       {isModalOpen && (
@@ -305,12 +349,19 @@ const styles = {
     tabBtn: { padding: '12px', border: 'none', cursor: 'pointer', fontWeight: 'bold' },
     searchInput: { padding: '12px', borderRadius: '8px', border: '1px solid #ccc', outline: 'none' },
     addBtn: { backgroundColor: '#D32F2F', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
+    
+    // Desktop Table Styles
     tableContainer: { backgroundColor: 'white', borderRadius: '10px', overflow: 'hidden', marginTop:'20px', border: '1px solid #eee' },
     table: { width: '100%', borderCollapse: 'collapse' },
     th: { padding: '15px', textAlign: 'left', fontSize: '0.85rem', color: '#555', borderBottom: '2px solid #eee' },
     td: { padding: '15px', fontSize: '0.9rem' },
+    
+    // Mobile Card Styles
+    mobileCard: { backgroundColor: 'white', padding: '15px', borderRadius: '12px', border: '1px solid #eee', boxShadow: '0 2px 5px rgba(0,0,0,0.05)' },
+
     editBtn: { backgroundColor: '#E3F2FD', color: '#1565C0', border: 'none', padding: '5px 10px', borderRadius: '4px', marginRight: '5px', cursor: 'pointer', fontWeight: 'bold' },
     deleteBtn: { backgroundColor: '#FFEBEE', color: '#C62828', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' },
+    
     modalOverlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
     modal: { backgroundColor: 'white', padding: '25px', borderRadius: '12px', maxHeight:'90vh', overflowY:'auto' },
     label: { fontSize: '0.7rem', fontWeight: 'bold', color: '#666' },

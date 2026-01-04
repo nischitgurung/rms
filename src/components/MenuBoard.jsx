@@ -16,20 +16,20 @@ import { Helmet, HelmetProvider } from 'react-helmet-async';
 // --- STYLES HELPER ---
 const styles = {
   qtyBtn: { width:'32px', height:'32px', borderRadius:'8px', border:'1px solid #ddd', cursor:'pointer', background:'white', fontWeight:'bold', fontSize:'1.1rem', display:'flex', alignItems:'center', justifyContent:'center' },
-  catBtn: { padding: '10px 20px', borderRadius: '30px', border: '1px solid #eee', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: '600', fontSize: '0.9rem', transition: 'all 0.2s', boxShadow:'0 2px 5px rgba(0,0,0,0.05)' },
+  catBtn: { padding: '8px 16px', borderRadius: '30px', border: '1px solid #eee', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: '600', fontSize: '0.85rem', transition: 'all 0.2s', boxShadow:'0 2px 5px rgba(0,0,0,0.05)' },
   
   // CARD STYLING
   itemCard: { 
     backgroundColor: 'white', 
-    borderRadius: '16px', 
+    borderRadius: '12px', 
     cursor: 'pointer', 
     border: 'none', 
-    boxShadow: '0 4px 12px rgba(0,0,0,0.08)', 
+    boxShadow: '0 2px 8px rgba(0,0,0,0.06)', 
     overflow: 'hidden', 
     display: 'flex',
     flexDirection: 'column',
     height: '100%', 
-    minHeight: '260px', 
+    // minHeight is dynamic in component
     transition: 'transform 0.2s, box-shadow 0.2s',
     boxSizing: 'border-box',
     position: 'relative'
@@ -38,7 +38,7 @@ const styles = {
   // SINGLE IMAGE
   itemImage: {
     width: '100%',
-    height: '160px', 
+    // height is dynamic
     objectFit: 'cover', 
     backgroundColor: '#f8f9fa',
     flexShrink: 0
@@ -47,24 +47,24 @@ const styles = {
   // COMBO TEXT BOX (Replaces Image Grid)
   comboTextBox: {
     width: '100%',
-    height: '160px',
-    backgroundColor: '#E3F2FD', // Light Blue background for deals
+    // height is dynamic
+    backgroundColor: '#E3F2FD', 
     color: '#1565C0',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: '15px',
+    padding: '10px',
     boxSizing: 'border-box',
     flexShrink: 0,
-    fontSize: '0.9rem',
+    fontSize: '0.8rem',
     fontWeight: '500',
     textAlign: 'center',
-    lineHeight: '1.5'
+    lineHeight: '1.4'
   },
 
   itemInfo: {
-    padding: '12px 15px',
+    padding: '10px',
     textAlign: 'left',
     display: 'flex',
     flexDirection: 'column',
@@ -73,8 +73,8 @@ const styles = {
     minHeight: '0' 
   },
   itemNameText: {
-    margin: '0 0 5px 0', 
-    fontSize: '1rem', 
+    margin: '0 0 4px 0', 
+    fontSize: '0.9rem', 
     fontWeight: '700',
     lineHeight: '1.2em',
     color: '#2c3e50',
@@ -86,8 +86,8 @@ const styles = {
   itemPriceText: {
     fontWeight: '800', 
     color: '#27ae60', 
-    fontSize: '1.1rem',
-    marginTop: '8px',
+    fontSize: '1rem',
+    marginTop: 'auto', // Pushes to bottom
     display: 'block'
   },
   
@@ -109,13 +109,13 @@ const styles = {
   // COMBO BADGE
   comboBadge: {
     position: 'absolute',
-    top: '10px',
-    left: '10px',
+    top: '8px',
+    left: '8px',
     backgroundColor: '#FF9800',
     color: 'white',
-    padding: '4px 8px',
-    borderRadius: '12px',
-    fontSize: '0.75rem',
+    padding: '2px 6px',
+    borderRadius: '8px',
+    fontSize: '0.7rem',
     fontWeight: 'bold',
     zIndex: 10,
     boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
@@ -124,18 +124,18 @@ const styles = {
   // FIX: RESTORED ORIGINAL BLACK BUTTON STYLE
   sendBtn: { 
     width: '100%', 
-    padding: '18px', 
+    padding: '15px', 
     backgroundColor: 'black', // Back to Black
     color: 'white', 
     border: 'none', 
-    borderRadius: '12px', 
+    borderRadius: '10px', 
     cursor: 'pointer', 
     fontWeight: 'bold', 
-    fontSize: '1.1rem', 
+    fontSize: '1rem', 
     letterSpacing:'0.5px' 
   },
 
-  searchInput: { width: '100%', padding: '12px 20px', borderRadius: '30px', border: '1px solid #ddd', marginBottom: '15px', fontSize: '1rem', outline: 'none', boxShadow:'inset 0 2px 5px rgba(0,0,0,0.02)' }
+  searchInput: { width: '100%', padding: '10px 15px', borderRadius: '30px', border: '1px solid #ddd', marginBottom: '10px', fontSize: '0.95rem', outline: 'none', boxShadow:'inset 0 2px 5px rgba(0,0,0,0.02)' }
 };
 
 // ==========================================
@@ -144,12 +144,12 @@ const styles = {
 const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, updateQty, removeItem, isMobile, detectedCombos, applyCombo }) => (
   <div style={{ 
     width: isMobile ? '100%' : '340px', 
-    height: isMobile ? 'calc(100vh - 60px)' : '100vh',
+    height: isMobile ? 'calc(100vh - 60px)' : '100vh', // Subtract nav bar height
     backgroundColor: 'white', 
     borderRight: isMobile ? 'none' : '1px solid #eee', 
     display: 'flex', flexDirection: 'column' 
   }}>
-    <div style={{ padding: '25px 20px', borderBottom: '1px solid #f0f0f0' }}>
+    <div style={{ padding: '20px', borderBottom: '1px solid #f0f0f0' }}>
       <h2 style={{ margin: '0 0 5px 0', fontSize: '1.4rem', color: '#2c3e50' }}>Current Order</h2>
       <div style={{ fontSize: '0.9rem', color: '#7f8c8d' }}>
         Table: <strong style={{color:'#2c3e50'}}>{initialTableName === 'Walk-in' ? 'Unassigned' : initialTableName}</strong>
@@ -157,39 +157,39 @@ const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, upd
     </div>
 
     {detectedCombos.length > 0 && (
-      <div style={{ backgroundColor: '#E3F2FD', padding: '12px 20px', borderBottom: '1px solid #BBDEFB' }}>
+      <div style={{ backgroundColor: '#E3F2FD', padding: '10px 15px', borderBottom: '1px solid #BBDEFB' }}>
         {detectedCombos.map(combo => (
           <div key={combo.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
             <div>
-                <span style={{ fontSize: '0.85rem', color: '#1565C0', fontWeight: 'bold', display:'block' }}>✨ Bundle Available!</span>
-                <span style={{ fontSize: '0.8rem', color: '#555' }}>{combo.name}</span>
+                <span style={{ fontSize: '0.8rem', color: '#1565C0', fontWeight: 'bold', display:'block' }}>✨ Deal Found!</span>
+                <span style={{ fontSize: '0.75rem', color: '#555' }}>{combo.name}</span>
             </div>
             <button 
                 onClick={() => applyCombo(combo)} 
-                style={{ padding: '6px 12px', backgroundColor: '#1976D2', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight:'bold' }}
+                style={{ padding: '6px 10px', backgroundColor: '#1976D2', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight:'bold' }}
             >
-                Apply (Rs.{combo.price})
+                Apply
             </button>
           </div>
         ))}
       </div>
     )}
     
-    <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }}>
+    <div style={{ flex: 1, overflowY: 'auto', padding: '15px', paddingBottom: '100px' /* Space for fixed footer */ }}>
       {cart.length === 0 && <div style={{padding:'40px 20px', textAlign:'center', color:'#bdc3c7', fontStyle:'italic'}}>Cart is empty</div>}
       {cart.map((item) => (
         <div key={item.cartId} style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px dashed #eee' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom:'8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom:'5px' }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: '600', color: '#2c3e50', fontSize:'0.95rem' }}>
+              <div style={{ fontWeight: '600', color: '#2c3e50', fontSize:'0.9rem' }}>
                 {item.isCombo ? '🎁 ' : ''}{item.name} 
-                <span style={{fontSize:'0.85rem', color:'#7f8c8d', marginLeft:'5px'}}>x{item.qty}</span>
+                <span style={{fontSize:'0.8rem', color:'#7f8c8d', marginLeft:'5px'}}>x{item.qty}</span>
               </div>
               {item.selectedExtras?.map(ex => (
-                <div key={ex.id} style={{ fontSize: '0.8rem', color: '#95a5a6' }}>+ {ex.name}</div>
+                <div key={ex.id} style={{ fontSize: '0.75rem', color: '#95a5a6' }}>+ {ex.name}</div>
               ))}
             </div>
-            <div style={{ fontWeight: '700', color: '#2c3e50', marginLeft: '10px' }}>
+            <div style={{ fontWeight: '700', color: '#2c3e50', marginLeft: '10px', fontSize:'0.9rem' }}>
               Rs. {(item.price * item.qty).toFixed(0)}
             </div>
           </div>
@@ -197,19 +197,28 @@ const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, upd
             <button onClick={() => updateQty(item.cartId, -1)} style={styles.qtyBtn}>-</button>
             <span style={{ fontSize:'0.9rem', fontWeight:'bold', minWidth:'20px', textAlign:'center' }}>{item.qty}</span>
             <button onClick={() => updateQty(item.cartId, 1)} style={styles.qtyBtn}>+</button>
-            <button onClick={() => removeItem(item.cartId)} style={{ marginLeft: '10px', background: 'none', border: 'none', cursor: 'pointer', fontSize:'1.1rem', opacity: 0.5 }}>🗑️</button>
+            <button onClick={() => removeItem(item.cartId)} style={{ marginLeft: '10px', background: 'none', border: 'none', cursor: 'pointer', fontSize:'1rem', opacity: 0.5 }}>🗑️</button>
           </div>
         </div>
       ))}
     </div>
 
-    <div style={{ padding: '20px', backgroundColor: '#f9f9f9', borderTop: '1px solid #eee' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '15px', color:'#2c3e50' }}>
+    {/* STICKY FOOTER FOR CART */}
+    <div style={{ 
+        padding: '15px', 
+        backgroundColor: '#fff', 
+        borderTop: '1px solid #eee', 
+        position: isMobile ? 'absolute' : 'relative',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 10
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.1rem', fontWeight: 'bold', marginBottom: '10px', color:'#2c3e50' }}>
         <span>Total</span>
         <span>Rs. {cart.reduce((acc, item) => acc + (item.price * item.qty), 0).toFixed(2)}</span>
       </div>
       
-      {/* FIX: RESTORED ORIGINAL TEXT */}
       <button onClick={handleSendClick} style={styles.sendBtn}>
         {initialTableId === 'Walk-in' ? 'SELECT TABLE & SEND' : 'SEND TO KITCHEN'}
       </button>
@@ -232,10 +241,10 @@ const MenuView = ({ categories, activeCategory, setActiveCategory, items, handle
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: isMobile ? 'calc(100vh - 60px)' : '100vh', backgroundColor:'#f4f6f8' }}>
-      <div style={{ padding: '20px', backgroundColor: 'white', borderBottom: '1px solid #eee' }}>
-        <input type="text" placeholder="🔍 Find food, drinks, bundles..." style={styles.searchInput} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-        <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '5px', scrollbarWidth: 'none' }}>
-          <button onClick={() => setActiveCategory('All')} style={{ ...styles.catBtn, backgroundColor: activeCategory === 'All' ? '#2c3e50' : 'white', color: activeCategory === 'All' ? 'white' : '#2c3e50' }}>All Items</button>
+      <div style={{ padding: isMobile ? '10px' : '20px', backgroundColor: 'white', borderBottom: '1px solid #eee' }}>
+        <input type="text" placeholder="🔍 Search..." style={styles.searchInput} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '5px', scrollbarWidth: 'none' }}>
+          <button onClick={() => setActiveCategory('All')} style={{ ...styles.catBtn, backgroundColor: activeCategory === 'All' ? '#2c3e50' : 'white', color: activeCategory === 'All' ? 'white' : '#2c3e50' }}>All</button>
           
           {categories.map(cat => (
              <button key={cat.id} onClick={() => setActiveCategory(cat.id)} style={{ ...styles.catBtn, backgroundColor: activeCategory === cat.id ? '#2c3e50' : 'white', color: activeCategory === cat.id ? 'white' : '#2c3e50' }}>{cat.name}</button>
@@ -245,19 +254,32 @@ const MenuView = ({ categories, activeCategory, setActiveCategory, items, handle
         </div>
       </div>
       
+      {/* OPTIMIZED GRID FOR MOBILE */}
       <div style={{ 
-        flex: 1, padding: '20px', overflowY: 'auto', display: 'grid', 
+        flex: 1, 
+        padding: isMobile ? '10px' : '20px', 
+        overflowY: 'auto', 
+        display: 'grid', 
         gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', 
-        gap: '20px', alignContent: 'start'
+        gap: isMobile ? '10px' : '20px', 
+        alignContent: 'start',
+        paddingBottom: isMobile ? '80px' : '20px'
       }}>
         {filteredItems.map(item => (
-          <div key={item.id} onClick={() => handleItemClick(item)} style={styles.itemCard}>
+          <div 
+            key={item.id} 
+            onClick={() => handleItemClick(item)} 
+            style={{
+                ...styles.itemCard,
+                minHeight: isMobile ? '200px' : '260px' // Shorter cards on mobile
+            }}
+          >
             
             {item.isCombo && <div style={styles.comboBadge}>DEAL</div>}
 
             {/* COMBO DISPLAY: TEXT ONLY, NO PICTURE */}
             {item.isCombo ? (
-                <div style={styles.comboTextBox}>
+                <div style={{...styles.comboTextBox, height: isMobile ? '120px' : '160px'}}>
                     {item.comboItems && item.comboItems.slice(0,4).map((sub, i) => (
                         <div key={i}>• {sub.qty}x {sub.name}</div>
                     ))}
@@ -267,7 +289,7 @@ const MenuView = ({ categories, activeCategory, setActiveCategory, items, handle
                 <img 
                   src={item.imageUrl || 'https://via.placeholder.com/300x200?text=No+Image'} 
                   alt={item.altText || item.name} 
-                  style={styles.itemImage} 
+                  style={{...styles.itemImage, height: isMobile ? '120px' : '160px'}} 
                   loading="lazy"
                 />
             )}

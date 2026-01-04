@@ -376,34 +376,67 @@ const AdminMenu = () => {
         </div>
       )}
 
-      {/* TABLE VIEW */}
-      <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-            <thead style={{ backgroundColor: '#f9f9f9', borderBottom: '1px solid #eee' }}>
-              <tr>
-                <th style={styles.th}>Image</th>
-                <th style={styles.th}>Dish Name</th>
-                <th style={styles.th}>Price</th>
-                <th style={styles.th}>Category</th>
-                <th style={styles.th}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+      {/* DATA VIEW - MOBILE CARD LIST vs DESKTOP TABLE */}
+      {isMobile ? (
+          /* MOBILE CARD LIST VIEW */
+          <div style={{ display: 'grid', gap: '15px', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))' }}>
               {filteredItems.map((item) => (
-                <tr key={item.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                  <td style={styles.td}><img src={item.imageUrl} alt="" style={{width:'50px', height:'40px', objectFit:'cover', borderRadius:'4px'}} /></td>
-                  <td style={styles.td}><b>{item.name}</b></td>
-                  <td style={styles.td}>Rs. {item.price}</td>
-                  <td style={{...styles.td, textTransform: 'capitalize'}}>{getCategoryName(item.categoryId)}</td>
-                  <td style={styles.td}>
-                    <button onClick={() => handleEditClick(item)} style={{marginRight:'10px', color:'blue', border:'none', background:'none', cursor:'pointer'}}>Edit</button>
-                    <button onClick={() => handleDelete(item.id)} style={{color:'red', border:'none', background:'none', cursor:'pointer'}}>Delete</button>
-                  </td>
-                </tr>
+                  <div key={item.id} style={{ backgroundColor: 'white', padding: '15px', borderRadius: '12px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', display: 'flex', gap: '15px' }}>
+                      {/* Image Thumbnail */}
+                      <img 
+                        src={item.imageUrl || 'https://via.placeholder.com/100'} 
+                        alt={item.name} 
+                        style={{ width: '80px', height: '80px', borderRadius: '8px', objectFit: 'cover', flexShrink: 0 }} 
+                      />
+                      
+                      {/* Content */}
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                          <div>
+                              <div style={{ fontWeight: 'bold', fontSize: '1rem', marginBottom: '2px' }}>{item.name}</div>
+                              <div style={{ fontSize: '0.8rem', color: '#666', textTransform: 'capitalize' }}>{getCategoryName(item.categoryId)}</div>
+                          </div>
+                          
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <span style={{ fontWeight: 'bold', color: '#4CAF50' }}>Rs. {item.price}</span>
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                  <button onClick={() => handleEditClick(item)} style={{ padding: '5px 10px', background: '#E3F2FD', color: '#1976D2', border: 'none', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>Edit</button>
+                                  <button onClick={() => handleDelete(item.id)} style={{ padding: '5px 10px', background: '#FFEBEE', color: '#D32F2F', border: 'none', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>Del</button>
+                              </div>
+                          </div>
+                      </div>
+                  </div>
               ))}
-            </tbody>
-          </table>
-      </div>
+          </div>
+      ) : (
+          /* DESKTOP TABLE VIEW */
+          <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead style={{ backgroundColor: '#f9f9f9', borderBottom: '1px solid #eee' }}>
+                  <tr>
+                    <th style={styles.th}>Image</th>
+                    <th style={styles.th}>Dish Name</th>
+                    <th style={styles.th}>Price</th>
+                    <th style={styles.th}>Category</th>
+                    <th style={styles.th}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredItems.map((item) => (
+                    <tr key={item.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                      <td style={styles.td}><img src={item.imageUrl} alt="" style={{width:'50px', height:'40px', objectFit:'cover', borderRadius:'4px'}} /></td>
+                      <td style={styles.td}><b>{item.name}</b></td>
+                      <td style={styles.td}>Rs. {item.price}</td>
+                      <td style={{...styles.td, textTransform: 'capitalize'}}>{getCategoryName(item.categoryId)}</td>
+                      <td style={styles.td}>
+                        <button onClick={() => handleEditClick(item)} style={{marginRight:'10px', color:'blue', border:'none', background:'none', cursor:'pointer'}}>Edit</button>
+                        <button onClick={() => handleDelete(item.id)} style={{color:'red', border:'none', background:'none', cursor:'pointer'}}>Delete</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+          </div>
+      )}
     </div>
   );
 };
