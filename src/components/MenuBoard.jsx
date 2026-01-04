@@ -18,7 +18,7 @@ const styles = {
   qtyBtn: { width:'32px', height:'32px', borderRadius:'8px', border:'1px solid #ddd', cursor:'pointer', background:'white', fontWeight:'bold', fontSize:'1.1rem', display:'flex', alignItems:'center', justifyContent:'center' },
   catBtn: { padding: '10px 20px', borderRadius: '30px', border: '1px solid #eee', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: '600', fontSize: '0.9rem', transition: 'all 0.2s', boxShadow:'0 2px 5px rgba(0,0,0,0.05)' },
   
-  // FIX: CARD LAYOUT (Ensures price is always visible)
+  // FIX: CARD LAYOUT TO FORCE PRICE VISIBILITY
   itemCard: { 
     backgroundColor: 'white', 
     borderRadius: '16px', 
@@ -29,45 +29,50 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     height: '100%', 
-    minHeight: '250px', // Reduced slightly to fit better
+    minHeight: '280px', // Increased slightly to ensure room for price
     transition: 'transform 0.2s, box-shadow 0.2s',
     boxSizing: 'border-box',
     position: 'relative'
   },
   itemImage: {
     width: '100%',
-    height: '160px', // Fixed height instead of aspect ratio for stability
+    aspectRatio: '4/3', // Keeps image strict square-ish rectangle
     objectFit: 'cover', 
     backgroundColor: '#f8f9fa',
-    flexShrink: 0
+    flexShrink: 0 // Prevents image from shrinking
   },
   itemInfo: {
-    padding: '12px 15px',
+    padding: '12px',
     textAlign: 'left',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
-    flex: 1, // This makes it fill the rest of the card
-    minHeight: '0' // Prevents flex overflow issues
+    flexGrow: 1, // Forces this section to fill remaining height
+    minHeight: '100px' // Guarantees space for text and price
   },
   itemNameText: {
-    margin: '0 0 5px 0', 
+    margin: '0 0 8px 0', 
     fontSize: '1rem', 
     fontWeight: '700',
-    lineHeight: '1.2em',
-    color: '#2c3e50',
-    // Text truncation logic
+    lineHeight: '1.3em',
+    // Limit to 2 lines so it doesn't push price out
+    height: '2.6em', 
+    overflow: 'hidden',
     display: '-webkit-box',
     WebkitLineClamp: 2,
     WebkitBoxOrient: 'vertical',
-    overflow: 'hidden'
+    color: '#2c3e50'
   },
+  // FIX: PRICE STYLING
   itemPriceText: {
     fontWeight: '800', 
     color: '#27ae60', 
     fontSize: '1.1rem',
-    marginTop: '8px', // Ensure separation from name
-    display: 'block'
+    marginTop: 'auto', // Critical: Pushes price to the absolute bottom of the flex container
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%'
   },
   sendBtn: { width: '100%', padding: '18px', backgroundColor: '#2c3e50', color: 'white', border: 'none', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.1rem', letterSpacing:'0.5px' },
   modalOverlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, backdropFilter: 'blur(3px)' },
@@ -93,7 +98,7 @@ const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, upd
       </div>
     </div>
 
-    {/* COMBO DETECTION NOTIFICATION */}
+    {/* COMBO NOTIFICATION */}
     {detectedCombos.length > 0 && (
       <div style={{ backgroundColor: '#E3F2FD', padding: '12px 20px', borderBottom: '1px solid #BBDEFB' }}>
         {detectedCombos.map(combo => (
@@ -113,7 +118,7 @@ const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, upd
       </div>
     )}
     
-    <div style={{ flex: 1, overflow: 'auto', padding: '15px' }}>
+    <div style={{ flex: 1, overflowY: 'auto', padding: '15px' }}>
       {cart.length === 0 && <div style={{padding:'40px 20px', textAlign:'center', color:'#bdc3c7', fontStyle:'italic'}}>Cart is empty</div>}
       {cart.map((item) => (
         <div key={item.cartId} style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px dashed #eee' }}>
@@ -177,7 +182,6 @@ const MenuView = ({ categories, activeCategory, setActiveCategory, items, handle
         </div>
       </div>
       
-      {/* CARD GRID */}
       <div style={{ 
         flex: 1, padding: '20px', overflowY: 'auto', display: 'grid', 
         gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', 
@@ -193,9 +197,12 @@ const MenuView = ({ categories, activeCategory, setActiveCategory, items, handle
             />
             <div style={styles.itemInfo}>
               <h4 style={styles.itemNameText}>{item.isCombo && '🎁 '}{item.name}</h4>
+              
+              {/* --- PRICE VISIBILITY FIX --- */}
               <div style={styles.itemPriceText}>
-                {/* Fallback to 0 if price is missing */}
-                Rs. {item.price || '0'}
+                <span>Rs. {item.price}</span>
+                {/* Optional Plus icon for UX */}
+                <span style={{fontSize:'1.2rem', color:'#ccc', fontWeight:'normal'}}>+</span>
               </div>
             </div>
           </div>
@@ -253,7 +260,6 @@ const MenuBoard = () => {
   const location = useLocation();
   const { tableId: initialTableId, tableName: initialTableName } = location.state || { tableId: 'Walk-in', tableName: 'Walk-in' };
 
-  // DATA STATES
   const [categories, setCategories] = useState([]);
   const [items, setItems] = useState([]);
   const [inventoryItems, setInventoryItems] = useState([]);
@@ -261,7 +267,6 @@ const MenuBoard = () => {
   const [combos, setCombos] = useState([]); 
   const [tables, setTables] = useState([]);
 
-  // UI STATES
   const [activeCategory, setActiveCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState(''); 
   const [cart, setCart] = useState([]);
@@ -286,7 +291,7 @@ const MenuBoard = () => {
 
         setCategories(catSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (a.sortOrder || 0) - (b.sortOrder || 0)));
         
-        // MERGE ITEMS AND COMBOS
+        // --- MERGE ITEMS AND COMBOS ---
         const fetchedMenuItems = itemSnap.docs.map(d => ({id: d.id, ...d.data()}));
         const fetchedCombos = comboSnap.docs.map(d => ({id: d.id, ...d.data(), isCombo: true, categoryId: 'Deals'})); 
         
@@ -349,7 +354,7 @@ const MenuBoard = () => {
     setShowTableSelector(false);
   };
 
-  // --- COMBO DETECTION ---
+  // --- COMBO DETECTION LOGIC ---
   const checkAvailableCombos = () => {
       if (!combos || combos.length === 0 || cart.length === 0) return [];
       const detected = [];
@@ -452,7 +457,7 @@ const MenuBoard = () => {
               <div style={{padding:'20px'}}>
                   <h2 style={{margin:'0 0 10px 0', color:'#2c3e50'}}>{selectedItem.name}</h2>
 
-                  {/* COMBO CONTENTS DISPLAY */}
+                  {/* COMBO CONTENTS */}
                   {selectedItem.isCombo && selectedItem.comboItems && (
                       <div style={{backgroundColor:'#E3F2FD', padding:'10px', borderRadius:'8px', marginBottom:'15px', textAlign:'left'}}>
                           <h4 style={{margin:'0 0 5px 0', fontSize:'0.9rem', color:'#1565C0'}}>Combo Includes:</h4>

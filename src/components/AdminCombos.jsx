@@ -3,6 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 
+// HELPER: Auto-creates URL-friendly slugs
+const generateSlug = (text) => {
+    return text.toLowerCase().trim().replace(/[^\w ]+/g, '').replace(/ +/g, '-');    
+};
+
 const AdminCombos = () => {
   const navigate = useNavigate();
   
@@ -21,13 +26,16 @@ const AdminCombos = () => {
   // Filter
   const [filterText, setFilterText] = useState('');
 
-  // Form Data
+  // Form Data (Added SEO Fields)
   const [formData, setFormData] = useState({
     name: '', 
     price: '', 
     description: '', 
     comboItems: [], 
-    isAvailable: true
+    isAvailable: true,
+    seoTitle: '',        // NEW: For Search Aliases
+    seoDescription: '',  // NEW: To list contents for search
+    slug: ''             // NEW: For URL
   });
 
   // --- 1. DATA FETCHING ---
@@ -111,7 +119,10 @@ const AdminCombos = () => {
           price: combo.price,
           description: combo.description || '',
           comboItems: formattedItems,
-          isAvailable: combo.isAvailable
+          isAvailable: combo.isAvailable,
+          seoTitle: combo.seoTitle || '',
+          seoDescription: combo.seoDescription || '',
+          slug: combo.slug || generateSlug(combo.name)
       });
       setEditingId(combo.id);
       setShowForm(true);
@@ -124,12 +135,29 @@ const AdminCombos = () => {
     if (formData.comboItems.length === 0) return alert("Please select items.");
 
     try {
+        // AUTO-GENERATE SEO DESCRIPTION IF EMPTY
+        // This ensures that searching for "Burger" finds the "Family Feast" combo
+        let autoSeoDesc = formData.seoDescription;
+        if (!autoSeoDesc) {
+            const contents = formData.comboItems.map(i => `${i.qty}x ${i.name}`).join(', ');
+            autoSeoDesc = `Includes: ${contents}`;
+        }
+
         const flatIds = formData.comboItems.map(item => item.id);
+        
         const payload = {
-            ...formData,
-            itemIds: flatIds,
+            name: formData.name,
             price: parseFloat(formData.price),
-            createdAt: editingId ? formData.createdAt : serverTimestamp() 
+            description: formData.description,
+            comboItems: formData.comboItems,
+            isAvailable: formData.isAvailable,
+            itemIds: flatIds,
+            // SEO DATA
+            seoTitle: formData.seoTitle || formData.name,
+            seoDescription: autoSeoDesc,
+            slug: formData.slug || generateSlug(formData.name),
+            updatedAt: serverTimestamp(),
+            createdAt: editingId ? (formData.createdAt || serverTimestamp()) : serverTimestamp()
         };
 
         if (editingId) {
@@ -139,7 +167,7 @@ const AdminCombos = () => {
             await addDoc(collection(db, "combos"), payload);
             alert("Combo Created!");
         }
-        setFormData({ name: '', price: '', description: '', comboItems: [], isAvailable: true });
+        setFormData({ name: '', price: '', description: '', comboItems: [], isAvailable: true, seoTitle: '', seoDescription: '', slug: '' });
         setEditingId(null);
         setShowForm(false);
     } catch (error) {
@@ -171,7 +199,7 @@ const AdminCombos = () => {
         <div style={{ display: 'flex', gap: '10px', width: isMobile ? '100%' : 'auto' }}>
             <button onClick={() => navigate('/')} style={{ flex: 1, padding: '10px', border: '1px solid #ccc', background: 'white', borderRadius: '6px' }}>Back</button>
             <button 
-              onClick={() => { setShowForm(!showForm); setEditingId(null); setFormData({ name: '', price: '', description: '', comboItems: [], isAvailable: true }); }} 
+              onClick={() => { setShowForm(!showForm); setEditingId(null); setFormData({ name: '', price: '', description: '', comboItems: [], isAvailable: true, seoTitle: '', seoDescription: '', slug: '' }); }} 
               style={{ flex: 2, padding: '10px', backgroundColor: 'black', color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold' }}
             >
               {showForm ? "✕ Close" : "+ Add Combo"}
@@ -204,7 +232,7 @@ const AdminCombos = () => {
             <div style={{display:'grid', gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr', gap:'15px'}}>
                 <div>
                     <label style={styles.label}>Combo Name</label>
-                    <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} style={styles.input} placeholder="e.g. Family Feast" />
+                    <input type="text" required value={formData.name} onChange={e => setFormData({...formData, name: e.target.value, slug: generateSlug(e.target.value)})} style={styles.input} placeholder="e.g. Family Feast" />
                 </div>
                 <div>
                     <label style={styles.label}>Price (Rs.)</label>
@@ -212,10 +240,10 @@ const AdminCombos = () => {
                 </div>
             </div>
 
-            {/* SELECTION AREA - Responsive Stack */}
+            {/* SELECTION AREA */}
             <div style={{display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '20px', marginTop:'10px'}}>
                 
-                {/* SELECTED ITEMS (Order priority for mobile: see what you have first) */}
+                {/* SELECTED ITEMS */}
                 <div style={{flex: 1, order: isMobile ? 1 : 2}}>
                     <label style={styles.label}>Current Bundle ({formData.comboItems.reduce((acc, i) => acc + i.qty, 0)} items)</label>
                     <div style={{ minHeight: '80px', maxHeight: '200px', overflowY: 'auto', border: '2px dashed #ccc', borderRadius: '6px', padding:'10px', backgroundColor: '#fcfcfc' }}>
@@ -245,6 +273,30 @@ const AdminCombos = () => {
                             </div>
                         ))}
                     </div>
+                </div>
+            </div>
+
+            {/* SEO & AVAILABILITY SECTION */}
+            <div style={styles.seoBox}>
+                <h4 style={{margin:'0 0 10px 0', fontSize:'0.9rem', color:'#555'}}>🔍 SEO & Search Settings</h4>
+                <div style={{display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap:'15px'}}>
+                    <div>
+                        <label style={styles.label}>Search Keywords (SEO Title)</label>
+                        <input placeholder="Ex: Burger Deal, Lunch Offer" value={formData.seoTitle} onChange={e => setFormData({...formData, seoTitle: e.target.value})} style={styles.input} />
+                    </div>
+                    <div>
+                        <label style={styles.label}>URL Slug</label>
+                        <input value={formData.slug} readOnly style={{...styles.input, backgroundColor:'#f9f9f9'}} />
+                    </div>
+                </div>
+                <div style={{marginTop:'10px'}}>
+                    <label style={styles.label}>Search Description (Lists contents if empty)</label>
+                    <textarea 
+                        placeholder="Leave blank to auto-generate from Bundle contents..." 
+                        value={formData.seoDescription} 
+                        onChange={e => setFormData({...formData, seoDescription: e.target.value})} 
+                        style={{...styles.input, height:'50px'}} 
+                    />
                 </div>
             </div>
 
@@ -287,7 +339,7 @@ const AdminCombos = () => {
                 <thead style={{ backgroundColor: '#f9f9f9', borderBottom: '1px solid #eee' }}>
                   <tr>
                     <th style={styles.th}>Combo Name</th>
-                    <th style={styles.th}>Contents</th>
+                    <th style={styles.th}>Contents (Searchable)</th>
                     <th style={styles.th}>Price</th>
                     <th style={styles.th}>Status</th>
                     <th style={styles.th}>Actions</th>
@@ -322,7 +374,8 @@ const styles = {
     label: { display: 'block', marginBottom: '5px', fontSize: '0.85rem', fontWeight: 'bold', color: '#555' },
     th: { padding: '15px', textAlign: 'left', fontSize: '0.85rem', color: '#666', fontWeight: 'bold' },
     td: { padding: '15px', fontSize: '0.9rem', color: '#333' },
-    qtyBtn: { width:'28px', height:'28px', borderRadius:'6px', border:'none', backgroundColor:'white', cursor:'pointer', fontWeight:'bold', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 1px 3px rgba(0,0,0,0.1)' }
+    qtyBtn: { width:'28px', height:'28px', borderRadius:'6px', border:'none', backgroundColor:'white', cursor:'pointer', fontWeight:'bold', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 1px 3px rgba(0,0,0,0.1)' },
+    seoBox: { background: '#f9f9f9', padding: '15px', borderRadius: '8px', border: '1px solid #eee', marginTop: '10px', marginBottom: '10px' }
 };
 
 export default AdminCombos;
