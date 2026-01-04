@@ -60,28 +60,63 @@ const AdminMenu = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // --- ADDED: CLOUDINARY UPLOAD LOGIC ---
+  // --- IMAGE ADJUSTER & CLOUDINARY UPLOAD LOGIC ---
   const handleFileUpload = async (file) => {
     if (!file) return;
     setUploading(true);
-    const data = new FormData();
-    data.append("file", file);
-    data.append("upload_preset", "rms_uploads"); 
-    data.append("cloud_name", "driy6e3td"); 
 
-    try {
-      const res = await fetch(`https://api.cloudinary.com/v1_1/driy6e3td/image/upload`, {
-        method: "POST",
-        body: data,
-      });
-      const fileData = await res.json();
-      setFormData(prev => ({ ...prev, imageUrl: fileData.secure_url }));
-      setUploading(false);
-    } catch (err) {
-      console.error(err);
-      setUploading(false);
-      alert("Image upload failed");
-    }
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    img.onload = async () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Target 4:3 Ratio (800x600) for consistency
+        const targetWidth = 800;
+        const targetHeight = 600;
+        canvas.width = targetWidth;
+        canvas.height = targetHeight;
+
+        const imgAspect = img.width / img.height;
+        const targetAspect = targetWidth / targetHeight;
+        let drawWidth, drawHeight, offsetX, offsetY;
+
+        // Calculate Center Crop
+        if (imgAspect > targetAspect) {
+            drawHeight = img.height;
+            drawWidth = img.height * targetAspect;
+            offsetX = (img.width - drawWidth) / 2;
+            offsetY = 0;
+        } else {
+            drawWidth = img.width;
+            drawHeight = img.width / targetAspect;
+            offsetX = 0;
+            offsetY = (img.height - drawHeight) / 2;
+        }
+
+        ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight, 0, 0, targetWidth, targetHeight);
+        
+        canvas.toBlob(async (blob) => {
+            const data = new FormData();
+            data.append("file", blob);
+            data.append("upload_preset", "rms_uploads"); 
+            data.append("cloud_name", "driy6e3td"); 
+
+            try {
+              const res = await fetch(`https://api.cloudinary.com/v1_1/driy6e3td/image/upload`, {
+                method: "POST",
+                body: data,
+              });
+              const fileData = await res.json();
+              setFormData(prev => ({ ...prev, imageUrl: fileData.secure_url }));
+              setUploading(false);
+            } catch (err) {
+              console.error(err);
+              setUploading(false);
+              alert("Image upload failed");
+            }
+        }, 'image/jpeg', 0.85);
+    };
   };
 
   const handleDrop = (e) => {
@@ -201,13 +236,6 @@ const AdminMenu = () => {
       return matchesText && matchesCategory;
   });
 
-  const getTypeStyle = (type) => {
-      const label = type || 'Veg'; 
-      if (label === 'Non-Veg') return { bg: '#FFEBEE', color: '#C62828', border: '#EF9A9A' };
-      if (label === 'Drinks') return { bg: '#E3F2FD', color: '#1565C0', border: '#90CAF9' };
-      return { bg: '#E8F5E9', color: '#2E7D32', border: '#A5D6A7' };
-  };
-
   if (loading) return <div style={{padding:'40px', textAlign: 'center'}}>Loading Menu...</div>;
 
   return (
@@ -232,7 +260,7 @@ const AdminMenu = () => {
       </div>
 
       {/* STATS */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '25px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fit, minmax(150px, 1fr))', gap: '10px', marginBottom: '25px' }}>
           <div style={styles.statCard}>
               <div style={styles.statLabel}>Total Dishes</div>
               <div style={styles.statValue}>{stats.total}</div>
@@ -274,7 +302,6 @@ const AdminMenu = () => {
           <h3 style={{marginTop:0, fontSize: '1.1rem'}}>{editingId ? "Edit Dish" : "Add New Dish"}</h3>
           <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '15px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px' }}>
-               {/* ADDED: DRAG & DROP ZONE */}
                <div 
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={handleDrop}
@@ -283,11 +310,12 @@ const AdminMenu = () => {
                     backgroundImage: formData.imageUrl ? `url(${formData.imageUrl})` : 'none',
                     border: uploading ? '2px dashed blue' : '2px dashed #ccc'
                   }}
+                  onClick={() => document.getElementById('fileInput').click()}
                 >
                   {!formData.imageUrl && !uploading && <span>Drag Image Here</span>}
-                  {uploading && <span>Uploading...</span>}
-                  <input type="file" onChange={(e) => handleFileUpload(e.target.files[0])} style={styles.fileInput} id="fileInput" />
-                  {!uploading && <label htmlFor="fileInput" style={{marginTop:'10px', fontSize:'0.7rem', padding:'5px 10px', background:'#eee', borderRadius:'4px', cursor:'pointer'}}>Or Click to Browse</label>}
+                  {uploading && <span>Adjusting Aspect Ratio...</span>}
+                  <input type="file" onChange={(e) => handleFileUpload(e.target.files[0])} style={styles.fileInput} id="fileInput" hidden />
+                  {!uploading && <label htmlFor="fileInput" style={{marginTop:'10px', fontSize:'0.7rem', padding:'5px 10px', background:'#eee', borderRadius:'4px', cursor:'pointer'}}>Or Browse</label>}
                </div>
 
                <div style={{display:'grid', gap:'15px'}}>
@@ -308,116 +336,74 @@ const AdminMenu = () => {
                           </select>
                       </div>
                   </div>
+                  <div>
+                      <label style={styles.label}>Food Type</label>
+                      <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} style={styles.input}>
+                          <option value="Veg">Veg</option>
+                          <option value="Non-Veg">Non-Veg</option>
+                          <option value="Drinks">Drinks</option>
+                      </select>
+                  </div>
                </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr', gap: '15px' }}>
-                <div>
-                    <label style={styles.label}>Food Type</label>
-                    <select value={formData.type} onChange={e => setFormData({...formData, type: e.target.value})} style={styles.input}>
-                        <option value="Veg">Veg</option>
-                        <option value="Non-Veg">Non-Veg</option>
-                        <option value="Drinks">Drinks</option>
-                    </select>
-                </div>
-                <div style={{display: 'flex', alignItems:'center', marginTop: isMobile ? '0' : '25px', gridColumn: isMobile ? 'span 2' : 'span 2'}}>
-                    <label style={{display:'flex', alignItems:'center', cursor:'pointer', fontSize: '0.9rem'}}>
-                        <input type="checkbox" checked={formData.isAvailable} onChange={e => setFormData({...formData, isAvailable: e.target.checked})} style={{marginRight:'10px', width:'22px', height:'22px'}} />
-                        Available in Menu?
-                    </label>
-                </div>
-            </div>
-
-            {/* ADDED: SEO CMS SECTION */}
             <div style={styles.seoBox}>
                 <h4 style={{margin:0, fontSize: '0.9rem', color: '#333'}}>SEO / STAFF CMS</h4>
                 <div style={{display:'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap:'15px', marginTop:'10px'}}>
                     <div>
-                        <label style={styles.label}>Search Aliases (SEO Title)</label>
-                        <input placeholder="Ex: C. Momo, Plate 10" value={formData.seoTitle} onChange={e => setFormData({...formData, seoTitle: e.target.value})} style={styles.input} />
+                        <label style={styles.label}>Aliases</label>
+                        <input placeholder="Ex: Momo, Burger" value={formData.seoTitle} onChange={e => setFormData({...formData, seoTitle: e.target.value})} style={styles.input} />
                     </div>
                     <div>
-                        <label style={styles.label}>URL Slug (Auto)</label>
+                        <label style={styles.label}>URL Slug</label>
                         <input value={formData.slug} readOnly style={{...styles.input, backgroundColor:'#f9f9f9'}} />
                     </div>
                 </div>
                 <div style={{marginTop:'10px'}}>
-                    <label style={styles.label}>Staff Note / Allergy Warnings</label>
-                    <textarea placeholder="Ex: Contains ginger. Upsell Coke." value={formData.seoDescription} onChange={e => setFormData({...formData, seoDescription: e.target.value})} style={{...styles.input, height:'60px'}} />
+                    <label style={styles.label}>Staff Note (Allergy/Info)</label>
+                    <textarea placeholder="Staff instructions..." value={formData.seoDescription} onChange={e => setFormData({...formData, seoDescription: e.target.value})} style={{...styles.input, height:'60px'}} />
                 </div>
                 <div style={{marginTop:'10px'}}>
                     <label style={styles.label}>Plating Guide (Alt Text)</label>
-                    <input placeholder="Ex: Garnish with cilantro" value={formData.altText} onChange={e => setFormData({...formData, altText: e.target.value})} style={styles.input} />
+                    <input placeholder="Garnish instructions..." value={formData.altText} onChange={e => setFormData({...formData, altText: e.target.value})} style={styles.input} />
                 </div>
             </div>
 
-            <button type="submit" disabled={uploading} style={{ padding: '15px', backgroundColor: uploading ? '#ccc' : (editingId ? '#2196F3' : 'black'), color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', fontSize: '1rem', cursor: uploading ? 'not-allowed' : 'pointer' }}>
-              {uploading ? "Uploading Image..." : (editingId ? "Update Dish" : "Add to Menu")}
+            <button type="submit" disabled={uploading} style={{ padding: '15px', backgroundColor: uploading ? '#ccc' : (editingId ? '#2196F3' : 'black'), color: 'white', border: 'none', borderRadius: '6px', fontWeight: 'bold', cursor: uploading ? 'not-allowed' : 'pointer' }}>
+              {uploading ? "Processing Image..." : (editingId ? "Update Dish" : "Add to Menu")}
             </button>
           </form>
         </div>
       )}
 
-      {/* DATA VIEW (TABLE/CARDS) */}
-      {isMobile ? (
-          <div style={{ display: 'grid', gap: '15px' }}>
-              {filteredItems.map((item) => {
-                  const style = getTypeStyle(item.type);
-                  return (
-                    <div key={item.id} style={{ backgroundColor: 'white', padding: '15px', borderRadius: '12px', border: '1px solid #eee', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-                        <img src={item.imageUrl || 'https://via.placeholder.com/150'} alt={item.name} style={{ width: '100%', height: '120px', objectFit: 'cover', borderRadius: '8px', marginBottom: '10px' }} />
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                            <div style={{fontWeight:'bold', fontSize:'1rem'}}>{item.name}</div>
-                            <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 'bold', backgroundColor: style.bg, color: style.color, border: `1px solid ${style.border}` }}>
-                                {item.type || 'Veg'}
-                            </span>
-                        </div>
-                        <div style={{display:'flex', justifyContent:'space-between', color:'#666', fontSize:'0.85rem', marginBottom:'15px'}}>
-                            <span style={{textTransform: 'capitalize'}}>📂 {getCategoryName(item.categoryId)}</span>
-                            <span style={{color:'black', fontWeight:'bold'}}>Rs. {item.price}</span>
-                        </div>
-                        <div style={{display:'flex', gap:'10px'}}>
-                            <button onClick={() => handleEditClick(item)} style={{flex:1, padding:'10px', background:'#E3F2FD', color:'#1976D2', border:'none', borderRadius:'6px', fontWeight:'bold'}}>Edit</button>
-                            <button onClick={() => handleDelete(item.id)} style={{flex:1, padding:'10px', background:'#FFEBEE', color:'#D32F2F', border:'none', borderRadius:'6px', fontWeight:'bold'}}>Delete</button>
-                        </div>
-                    </div>
-                  );
-              })}
-          </div>
-      ) : (
-          <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead style={{ backgroundColor: '#f9f9f9', borderBottom: '1px solid #eee' }}>
-                  <tr>
-                    <th style={styles.th}>Image</th>
-                    <th style={styles.th}>Dish Name</th>
-                    <th style={styles.th}>Price</th>
-                    <th style={styles.th}>Category</th>
-                    <th style={styles.th}>Status</th>
-                    <th style={styles.th}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredItems.map((item) => {
-                    const style = getTypeStyle(item.type);
-                    return (
-                        <tr key={item.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                          <td style={styles.td}><img src={item.imageUrl || 'https://via.placeholder.com/150'} alt="" style={{width:'50px', height:'40px', objectFit:'cover', borderRadius:'4px'}} /></td>
-                          <td style={styles.td}><span style={{fontWeight:'bold'}}>{item.name}</span></td>
-                          <td style={styles.td}>Rs. {item.price}</td>
-                          <td style={{...styles.td, textTransform: 'capitalize'}}>{getCategoryName(item.categoryId)}</td>
-                          <td style={styles.td}>{item.isAvailable ? <span style={{color:'green', fontWeight:'bold'}}>Available</span> : <span style={{color:'red'}}>Hidden</span>}</td>
-                          <td style={styles.td}>
-                            <button onClick={() => handleEditClick(item)} style={{marginRight:'10px', padding:'6px 12px', background:'#E3F2FD', color:'#1976D2', border:'none', borderRadius:'4px', fontWeight:'bold'}}>Edit</button>
-                            <button onClick={() => handleDelete(item.id)} style={{padding:'6px 12px', background:'#FFEBEE', color:'#D32F2F', border:'none', borderRadius:'4px', fontWeight:'bold'}}>Delete</button>
-                          </td>
-                        </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-          </div>
-      )}
+      {/* TABLE VIEW */}
+      <div style={{ backgroundColor: 'white', borderRadius: '12px', boxShadow: '0 2px 5px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead style={{ backgroundColor: '#f9f9f9', borderBottom: '1px solid #eee' }}>
+              <tr>
+                <th style={styles.th}>Image</th>
+                <th style={styles.th}>Dish Name</th>
+                <th style={styles.th}>Price</th>
+                <th style={styles.th}>Category</th>
+                <th style={styles.th}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredItems.map((item) => (
+                <tr key={item.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                  <td style={styles.td}><img src={item.imageUrl} alt="" style={{width:'50px', height:'40px', objectFit:'cover', borderRadius:'4px'}} /></td>
+                  <td style={styles.td}><b>{item.name}</b></td>
+                  <td style={styles.td}>Rs. {item.price}</td>
+                  <td style={{...styles.td, textTransform: 'capitalize'}}>{getCategoryName(item.categoryId)}</td>
+                  <td style={styles.td}>
+                    <button onClick={() => handleEditClick(item)} style={{marginRight:'10px', color:'blue', border:'none', background:'none', cursor:'pointer'}}>Edit</button>
+                    <button onClick={() => handleDelete(item.id)} style={{color:'red', border:'none', background:'none', cursor:'pointer'}}>Delete</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+      </div>
     </div>
   );
 };
@@ -428,7 +414,7 @@ const styles = {
     statValue: { fontSize: '1.2rem', fontWeight: 'bold' },
     input: { width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '6px', fontSize: '0.9rem', boxSizing: 'border-box' },
     label: { display: 'block', marginBottom: '5px', fontSize: '0.75rem', fontWeight: 'bold', color: '#555' },
-    th: { padding: '15px', textAlign: 'left', fontSize: '0.85rem', color: '#666', fontWeight: 'bold' },
+    th: { padding: '15px', textAlign: 'left', fontSize: '0.85rem', color: '#666' },
     td: { padding: '15px', fontSize: '0.9rem', color: '#333' },
     seoBox: { background: '#f9f9f9', padding: '15px', borderRadius: '8px', border: '1px solid #eee', marginTop: '10px' },
     dropZone: { height: '180px', borderRadius: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative', backgroundColor: '#eee', cursor: 'pointer', overflow: 'hidden' },
