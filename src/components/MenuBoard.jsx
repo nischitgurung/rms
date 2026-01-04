@@ -16,10 +16,31 @@ import emailjs from '@emailjs/browser';
 const styles = {
   qtyBtn: { width:'30px', height:'30px', borderRadius:'50%', border:'1px solid #ddd', cursor:'pointer', background:'white', fontWeight:'bold' },
   catBtn: { padding: '10px 20px', borderRadius: '25px', border: '1px solid #ddd', cursor: 'pointer', whiteSpace: 'nowrap', fontWeight: '500' },
-  itemCard: { backgroundColor: 'white', padding: '15px', borderRadius: '12px', textAlign: 'center', cursor: 'pointer', border: '1px solid #eee', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' },
+  // Updated Item Card for Images
+  itemCard: { 
+    backgroundColor: 'white', 
+    borderRadius: '12px', 
+    cursor: 'pointer', 
+    border: '1px solid #eee', 
+    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+    overflow: 'hidden', // Ensures image corners follow border radius
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  itemImage: {
+    width: '100%',
+    height: '120px',
+    objectFit: 'cover', // Ensures image fills the space without stretching
+    backgroundColor: '#f0f0f0'
+  },
+  itemInfo: {
+    padding: '10px',
+    textAlign: 'center'
+  },
   sendBtn: { width: '100%', padding: '18px', backgroundColor: 'black', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1.1rem' },
   modalOverlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000 },
-  modal: { backgroundColor: 'white', padding: '30px', borderRadius: '15px', width: '350px', textAlign: 'center' }
+  modal: { backgroundColor: 'white', padding: '30px', borderRadius: '15px', width: '350px', textAlign: 'center' },
+  searchInput: { width: '100%', padding: '12px 15px', borderRadius: '8px', border: '1px solid #ddd', marginBottom: '10px', fontSize: '1rem', outline: 'none' }
 };
 
 // ==========================================
@@ -102,37 +123,62 @@ const CartView = ({
 );
 
 // ==========================================
-// 2. MENU VIEW COMPONENT
+// 2. MENU VIEW COMPONENT (Includes Search Bar)
 // ==========================================
-const MenuView = ({ categories, activeCategory, setActiveCategory, items, handleItemClick, isMobile }) => {
-  const filteredItems = activeCategory === 'All' 
-    ? items 
-    : items.filter(item => item.categoryId === activeCategory);
+const MenuView = ({ categories, activeCategory, setActiveCategory, items, handleItemClick, isMobile, searchTerm, setSearchTerm }) => {
+  // Filtering logic based on Category AND Search Term (matches Name or SEO Title alias)
+  const filteredItems = items.filter(item => {
+    const matchesCategory = activeCategory === 'All' || item.categoryId === activeCategory;
+    const matchesSearch = 
+        item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        (item.seoTitle && item.seoTitle.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    return matchesCategory && matchesSearch;
+  });
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: isMobile ? 'calc(100vh - 60px)' : '100vh' }}>
-      <div style={{ padding: '15px', backgroundColor: 'white', borderBottom: '1px solid #ddd', display: 'flex', gap: '10px', overflowX: 'auto' }}>
-        <button 
-          onClick={() => setActiveCategory('All')} 
-          style={{ ...styles.catBtn, backgroundColor: activeCategory === 'All' ? 'black' : 'white', color: activeCategory === 'All' ? 'white' : 'black' }}
-        >
-          All Items
-        </button>
-        {categories.map(cat => (
-           <button 
-            key={cat.id} 
-            onClick={() => setActiveCategory(cat.id)} 
-            style={{ ...styles.catBtn, backgroundColor: activeCategory === cat.id ? 'black' : 'white', color: activeCategory === cat.id ? 'white' : 'black' }}
+      <div style={{ padding: '15px', backgroundColor: 'white', borderBottom: '1px solid #ddd' }}>
+        {/* WAITER SEARCH BAR */}
+        <input 
+          type="text"
+          placeholder="🔍 Search food by name or nickname..."
+          style={styles.searchInput}
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+        
+        <div style={{ display: 'flex', gap: '10px', overflowX: 'auto', paddingBottom: '5px' }}>
+          <button 
+            onClick={() => setActiveCategory('All')} 
+            style={{ ...styles.catBtn, backgroundColor: activeCategory === 'All' ? 'black' : 'white', color: activeCategory === 'All' ? 'white' : 'black' }}
           >
-            {cat.name}
+            All Items
           </button>
-        ))}
+          {categories.map(cat => (
+             <button 
+              key={cat.id} 
+              onClick={() => setActiveCategory(cat.id)} 
+              style={{ ...styles.catBtn, backgroundColor: activeCategory === cat.id ? 'black' : 'white', color: activeCategory === cat.id ? 'white' : 'black' }}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
       </div>
-      <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '15px' }}>
+      
+      <div style={{ flex: 1, padding: '20px', overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '20px' }}>
         {filteredItems.map(item => (
           <div key={item.id} onClick={() => handleItemClick(item)} style={styles.itemCard}>
-            <h4 style={{ margin: '0 0 5px 0', fontSize: '1rem' }}>{item.isCombo && '🎁 '}{item.name}</h4>
-            <div style={{ fontWeight: 'bold', color: '#4CAF50' }}>Rs. {item.price}</div>
+            <img 
+              src={item.imageUrl || 'https://via.placeholder.com/150?text=No+Image'} 
+              alt={item.name} 
+              style={styles.itemImage} 
+            />
+            <div style={styles.itemInfo}>
+              <h4 style={{ margin: '0 0 5px 0', fontSize: '1rem' }}>{item.isCombo && '🎁 '}{item.name}</h4>
+              <div style={{ fontWeight: 'bold', color: '#4CAF50' }}>Rs. {item.price}</div>
+            </div>
           </div>
         ))}
       </div>
@@ -199,6 +245,7 @@ const MenuBoard = () => {
 
   // UI STATES
   const [activeCategory, setActiveCategory] = useState('All');
+  const [searchTerm, setSearchTerm] = useState(''); 
   const [cart, setCart] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showTableSelector, setShowTableSelector] = useState(false);
@@ -315,7 +362,6 @@ const MenuBoard = () => {
 
   const handleSendClick = () => {
     if (cart.length === 0) return alert("Cart empty");
-    // If POS opened without table (Walk-in), show selector
     if (initialTableId === 'Walk-in') {
       setShowTableSelector(true);
     } else {
@@ -365,12 +411,31 @@ const MenuBoard = () => {
       {!isMobile ? (
           <>
             <CartView cart={cart} initialTableName={initialTableName} initialTableId={initialTableId} handleSendClick={handleSendClick} updateQty={updateQty} removeItem={removeItem} isMobile={false} detectedCombos={checkAvailableCombos()} applyCombo={applyCombo} />
-            <MenuView categories={categories} activeCategory={activeCategory} setActiveCategory={setActiveCategory} items={items} handleItemClick={handleItemClick} />
+            <MenuView 
+              categories={categories} 
+              activeCategory={activeCategory} 
+              setActiveCategory={setActiveCategory} 
+              items={items} 
+              handleItemClick={handleItemClick}
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm} 
+            />
             <SidebarView navigate={navigate} isMobile={false} />
           </>
       ) : (
           <div style={{ flex: 1, overflow: 'hidden' }}>
-              {mobileTab === 'menu' && <MenuView categories={categories} activeCategory={activeCategory} setActiveCategory={setActiveCategory} items={items} handleItemClick={handleItemClick} isMobile={true} />}
+              {mobileTab === 'menu' && 
+                <MenuView 
+                  categories={categories} 
+                  activeCategory={activeCategory} 
+                  setActiveCategory={setActiveCategory} 
+                  items={items} 
+                  handleItemClick={handleItemClick} 
+                  isMobile={true} 
+                  searchTerm={searchTerm}
+                  setSearchTerm={setSearchTerm}
+                />
+              }
               {mobileTab === 'cart' && <CartView cart={cart} initialTableName={initialTableName} initialTableId={initialTableId} handleSendClick={handleSendClick} updateQty={updateQty} removeItem={removeItem} isMobile={true} detectedCombos={checkAvailableCombos()} applyCombo={applyCombo} />}
               {mobileTab === 'options' && <SidebarView navigate={navigate} isMobile={true} />}
           </div>
@@ -388,7 +453,27 @@ const MenuBoard = () => {
       {isModalOpen && selectedItem && (
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
+            <img 
+              src={selectedItem.imageUrl || 'https://via.placeholder.com/150'} 
+              alt={selectedItem.name} 
+              style={{ width: '100%', height: '150px', objectFit: 'cover', borderRadius: '10px', marginBottom: '15px' }} 
+            />
             <h2 style={{marginTop:0}}>{selectedItem.name}</h2>
+
+            {/* ADDED: Internal Staff Notes (SEO Description) */}
+            {selectedItem.seoDescription && (
+              <div style={{ backgroundColor: '#FFF9C4', padding: '12px', borderRadius: '8px', marginBottom: '15px', borderLeft: '4px solid #FBC02D', textAlign: 'left', fontSize: '0.85rem' }}>
+                <strong>💡 Note:</strong> {selectedItem.seoDescription}
+              </div>
+            )}
+
+            {/* ADDED: Plating Guide (Alt Text) */}
+            {selectedItem.altText && (
+              <div style={{ fontSize: '0.8rem', color: '#555', fontStyle: 'italic', marginBottom: '15px', textAlign: 'left', padding: '8px', borderLeft: '3px solid #ccc', backgroundColor: '#f9f9f9' }}>
+                <strong>👨‍Chef's Guide:</strong> {selectedItem.altText}
+              </div>
+            )}
+
             <div style={{ maxHeight: '200px', overflowY: 'auto', border: '1px solid #eee', padding: '10px', borderRadius: '8px', marginBottom: '20px', textAlign: 'left' }}>
                 {modifiers.map(mod => (
                     <label key={mod.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderBottom: '1px solid #f9f9f9', cursor: 'pointer' }}>
@@ -404,7 +489,7 @@ const MenuBoard = () => {
         </div>
       )}
 
-      {/* TABLE SELECTOR MODAL (Triggered when sending unassigned order) */}
+      {/* TABLE SELECTOR MODAL */}
       {showTableSelector && (
         <div style={{ ...styles.modalOverlay, zIndex: 3000 }}>
           <div style={{ ...styles.modal, width: '90%', maxWidth: '600px' }}>
