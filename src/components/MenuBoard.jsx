@@ -399,22 +399,27 @@ const MenuBoard = () => {
 
     const fetchData = async () => {
       try {
+        // 1. Fetch Categories
         const catSnap = await getDocs(collection(db, "categories"));
         const fetchedCategories = catSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (a.sortOrder || 0) - (b.sortOrder || 0));
         setCategories(fetchedCategories);
 
+        // 2. Fetch Menu Items (Needed to map images to combos)
         const itemSnap = await getDocs(collection(db, "menu_items"));
         const fetchedMenuItems = itemSnap.docs.map(d => ({id: d.id, ...d.data()}));
         
+        // Create a quick lookup map for images: ID -> ImageURL
         const imageMap = {};
         fetchedMenuItems.forEach(i => { imageMap[i.id] = i.imageUrl; });
 
+        // 3. Fetch Combos & Enrich with Images
         const comboSnap = await getDocs(collection(db, "combos")); 
         const fetchedCombos = comboSnap.docs.map(d => {
             const data = d.data();
+            // Enrich contents with images
             const enrichedContents = (data.comboItems || []).map(ci => ({
                 ...ci,
-                imageUrl: imageMap[ci.id] || null 
+                imageUrl: imageMap[ci.id] || null // Map ID to URL
             }));
 
             return {
@@ -426,9 +431,11 @@ const MenuBoard = () => {
             };
         });
 
+        // 4. Merge All Items
         setItems([...fetchedMenuItems, ...fetchedCombos]); 
         setCombos(fetchedCombos); 
         
+        // 5. Modifiers
         const modSnap = await getDocs(collection(db, "modifiers"));
         setModifiers(modSnap.docs.map(d => ({id: d.id, ...d.data()})).filter(m => m.isAvailable)); 
         
@@ -487,6 +494,7 @@ const MenuBoard = () => {
     setShowTableSelector(false);
   };
 
+  // --- COMBO DETECTION LOGIC ---
   const checkAvailableCombos = () => {
       if (!combos || combos.length === 0 || cart.length === 0) return [];
       const detected = [];
@@ -612,6 +620,13 @@ const MenuBoard = () => {
                               ))}
                           </ul>
                       </div>
+                  )}
+
+                  {/* FIX: ADDED PLATING GUIDE (ALT TEXT) */}
+                  {selectedItem.altText && (
+                    <div style={{ fontSize: '0.85rem', fontStyle: 'italic', color: '#555', marginBottom: '15px', borderLeft: '3px solid #ccc', paddingLeft: '10px' }}>
+                      👨‍🍳 <strong>Plating:</strong> {selectedItem.altText}
+                    </div>
                   )}
 
                   {/* SEO Note */}

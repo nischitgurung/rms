@@ -317,7 +317,7 @@ const TableManagement = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{display:'flex', alignItems:'center'}}>
                     <button onClick={() => navigate('/')} style={{ marginRight: '15px', padding: '10px 15px', border: '1px solid #ccc', background: 'white', borderRadius: '6px', cursor: 'pointer' }}>Back</button>
-                    <h1 style={{margin:0, fontSize: isMobile ? '1.5rem' : '2rem'}}>Table Mgmt</h1>
+                    <h1 style={{margin:0, fontSize: isMobile ? '1.5rem' : '2rem'}}>Table Management</h1>
                 </div>
                 
                 {/* ADD TABLE TOGGLE */}
