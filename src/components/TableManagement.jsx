@@ -6,7 +6,6 @@ import { collection, onSnapshot, doc, updateDoc, query, where, serverTimestamp, 
 import { Helmet, HelmetProvider } from 'react-helmet-async'; 
 
 // --- HELPER: PARSE TIME STRING TO DATE OBJECT ---
-// Converts "7:30 PM" to a Date object for today
 const parseTime = (timeStr) => {
     if (!timeStr) return null;
     const [time, modifier] = timeStr.split(' ');
@@ -26,6 +25,7 @@ const TableManagement = () => {
   const [tables, setTables] = useState([]);
   const [activeOrders, setActiveOrders] = useState([]); 
   const [loading, setLoading] = useState(true);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   
   // Search & Filter State
   const [searchTerm, setSearchTerm] = useState('');
@@ -66,14 +66,17 @@ const TableManagement = () => {
     "paymentPreference": ["KHALTI", "EBANKING", "MOBILE_BANKING", "CONNECT_IPS", "SCT"],
   };
 
-  // --- 1. FETCH TABLES & ACTIVE ORDERS ---
+  // --- 1. FETCH TABLES & RESPONSIVENESS ---
   useEffect(() => {
+    // Mobile Listener
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+
     const unsubTables = onSnapshot(collection(db, "tables"), (snapshot) => {
       const tableData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      // --- SORTING LOGIC: NUMERIC FIRST, THEN NEWLY ADDED AT END ---
       const sortedTables = tableData.sort((a, b) => {
-        const numA = parseInt(a.name.replace(/^\D+/g, '')) || 999999; // If no number, push to end
+        const numA = parseInt(a.name.replace(/^\D+/g, '')) || 999999; 
         const numB = parseInt(b.name.replace(/^\D+/g, '')) || 999999;
         return numA - numB;
       });
@@ -91,6 +94,7 @@ const TableManagement = () => {
     return () => {
         unsubTables();
         unsubOrders();
+        window.removeEventListener('resize', handleResize);
     };
   }, []);
 
@@ -102,7 +106,6 @@ const TableManagement = () => {
           tables.forEach(async (table) => {
               if (table.status === 'Reserved' && table.arrivalTime) {
                   const arrivalDate = parseTime(table.arrivalTime);
-                  // If current time > arrival time (guest is late), release table
                   if (arrivalDate && now > arrivalDate) {
                       console.log(`Auto-releasing table ${table.name} due to expiration.`);
                       try {
@@ -117,7 +120,7 @@ const TableManagement = () => {
                   }
               }
           });
-      }, 60000); // Check every 1 minute
+      }, 60000); 
 
       return () => clearInterval(checkReservations);
   }, [tables]);
@@ -136,21 +139,15 @@ const TableManagement = () => {
       };
   };
 
-  // --- SEARCH FILTER LOGIC (UPDATED WITH ARRIVAL TIME) ---
+  // --- SEARCH FILTER LOGIC ---
   const filteredTables = tables.filter(table => {
       if (!searchTerm) return true;
       const term = searchTerm.toLowerCase();
       
-      // 1. Search Table Name
       if (table.name.toLowerCase().includes(term)) return true;
-
-      // 2. Search Reservation Name
       if (table.status === 'Reserved' && table.reservedBy && table.reservedBy.toLowerCase().includes(term)) return true;
-
-      // 3. Search Arrival Time (New Feature)
       if (table.status === 'Reserved' && table.arrivalTime && table.arrivalTime.toLowerCase().includes(term)) return true;
-
-      // 4. Search Ordered Items
+      
       const { items } = getTableData(table.name);
       if (items.some(itemName => itemName.includes(term))) return true;
 
@@ -165,7 +162,7 @@ const TableManagement = () => {
               name: newTableName, 
               status: "Available", 
               guests: 0,
-              createdAt: serverTimestamp() // Helps with sorting stability if needed later
+              createdAt: serverTimestamp() 
           });
           setNewTableName('');
           setIsAddingTable(false);
@@ -223,7 +220,7 @@ const TableManagement = () => {
         await updateDoc(doc(db, "tables", selectedTable.id), { 
             status: "Reserved", 
             reservedBy: name,
-            arrivalTime: time // Saved for search and auto-release
+            arrivalTime: time 
         }); 
         setSelectedTable(null); 
     } catch (e) { console.error(e); }
@@ -308,7 +305,7 @@ const TableManagement = () => {
 
   return (
     <HelmetProvider>
-      <div style={{ padding: '20px', fontFamily: 'Arial, sans-serif' }}>
+      <div style={{ padding: isMobile ? '10px' : '20px', fontFamily: 'Arial, sans-serif' }}>
         
         {/* SEO META TAGS */}
         <Helmet>
@@ -319,37 +316,37 @@ const TableManagement = () => {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', marginBottom: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{display:'flex', alignItems:'center'}}>
-                    <button onClick={() => navigate('/')} style={{ marginRight: '20px', padding: '10px 15px', border: '1px solid #ccc', background: 'white', borderRadius: '6px', cursor: 'pointer' }}>Back</button>
-                    <h1 style={{margin:0}}>Table Management</h1>
+                    <button onClick={() => navigate('/')} style={{ marginRight: '15px', padding: '10px 15px', border: '1px solid #ccc', background: 'white', borderRadius: '6px', cursor: 'pointer' }}>Back</button>
+                    <h1 style={{margin:0, fontSize: isMobile ? '1.5rem' : '2rem'}}>Table Mgmt</h1>
                 </div>
                 
                 {/* ADD TABLE TOGGLE */}
                 <button 
                     onClick={() => setIsAddingTable(!isAddingTable)} 
-                    style={{ padding: '10px 15px', backgroundColor: '#333', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight:'bold' }}
+                    style={{ padding: '10px 15px', backgroundColor: '#333', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight:'bold', fontSize: isMobile ? '0.9rem' : '1rem' }}
                 >
-                    {isAddingTable ? "✕ Cancel" : "+ Add Table"}
+                    {isAddingTable ? "Cancel" : "+ Add Table"}
                 </button>
             </div>
             
             {/* ADD TABLE FORM */}
             {isAddingTable && (
-                <div style={{ padding: '15px', backgroundColor: '#f0f0f0', borderRadius: '8px', display: 'flex', gap: '10px' }}>
+                <div style={{ padding: '15px', backgroundColor: '#f0f0f0', borderRadius: '8px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '10px' }}>
                     <input 
                         type="text" 
                         placeholder="Enter Table Name (e.g. T-10)" 
                         value={newTableName} 
                         onChange={(e) => setNewTableName(e.target.value)}
-                        style={{ flex: 1, padding: '10px', borderRadius: '6px', border: '1px solid #ddd' }}
+                        style={{ flex: 1, padding: '12px', borderRadius: '6px', border: '1px solid #ddd', fontSize:'1rem' }}
                     />
-                    <button onClick={handleAddTable} style={{ padding: '10px 20px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Save</button>
+                    <button onClick={handleAddTable} style={{ padding: '12px 20px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Save</button>
                 </div>
             )}
 
-            {/* SEARCH BAR (Includes Time Search) */}
+            {/* SEARCH BAR */}
             <input 
                 type="text" 
-                placeholder="Search by Table, Guest, Arrival Time (e.g. 7:30), or Item..." 
+                placeholder="Search Table, Guest, Time (7:30)..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={{
@@ -358,12 +355,17 @@ const TableManagement = () => {
                     borderRadius: '8px',
                     border: '1px solid #ddd',
                     width: '100%',
-                    maxWidth: '500px'
+                    maxWidth: '100%' // Full width on mobile
                 }}
             />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '20px' }}>
+        {/* RESPONSIVE GRID: 2 Columns on Mobile, Auto on Desktop */}
+        <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fill, minmax(200px, 1fr))', 
+            gap: isMobile ? '10px' : '20px' 
+        }}>
           {filteredTables.map(table => {
               const { status: kStatus } = getTableData(table.name); 
               const badge = getKitchenBadge(kStatus);
@@ -371,23 +373,23 @@ const TableManagement = () => {
               return (
                 <div key={table.id} onClick={() => handleTableClick(table)}
                   style={{ 
-                    border: '1px solid #ddd', borderRadius: '12px', padding: '20px', 
+                    border: '1px solid #ddd', borderRadius: '12px', padding: isMobile ? '15px' : '20px', 
                     boxShadow: '0 4px 6px rgba(0,0,0,0.05)', cursor: 'pointer', backgroundColor: 'white', position: 'relative',
                     borderTop: `6px solid ${getStatusColor(table.status)}`,
-                    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: '140px'
+                    display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minHeight: isMobile ? '120px' : '140px'
                   }}>
                   
                   <div>
-                      <h3 style={{ margin: '0 0 5px 0', fontSize: '1.4rem' }}>{table.name}</h3>
-                      <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', backgroundColor: getStatusColor(table.status), color: 'white', fontWeight: 'bold' }}>{table.status}</span>
+                      <h3 style={{ margin: '0 0 5px 0', fontSize: isMobile ? '1.2rem' : '1.4rem' }}>{table.name}</h3>
+                      <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '0.75rem', backgroundColor: getStatusColor(table.status), color: 'white', fontWeight: 'bold' }}>{table.status}</span>
                       
                       {/* --- SHOW RESERVATION & ARRIVAL TIME --- */}
                       {table.status === 'Reserved' && table.reservedBy && (
                           <div style={{ marginTop: '10px', borderTop: '1px dashed #FFC107', paddingTop: '8px' }}>
-                              <div style={{ fontSize: '0.9rem', color: '#E65100', fontWeight: 'bold' }}>{table.reservedBy}</div>
+                              <div style={{ fontSize: '0.85rem', color: '#E65100', fontWeight: 'bold' }}>{table.reservedBy}</div>
                               {table.arrivalTime && (
-                                  <div style={{ fontSize: '0.8rem', color: '#555', marginTop:'2px' }}>
-                                      🕒 Arriving: <strong>{table.arrivalTime}</strong>
+                                  <div style={{ fontSize: '0.75rem', color: '#555', marginTop:'2px' }}>
+                                      🕒 {table.arrivalTime}
                                   </div>
                               )}
                           </div>
@@ -397,14 +399,14 @@ const TableManagement = () => {
                   {/* --- KITCHEN STATUS BADGE --- */}
                   {badge && (
                       <div style={{ 
-                          marginTop: '15px', 
+                          marginTop: '10px', 
                           backgroundColor: badge.bg, 
                           color: badge.text, 
-                          padding: '8px', 
+                          padding: '6px', 
                           borderRadius: '6px', 
                           textAlign: 'center', 
                           fontWeight: 'bold',
-                          fontSize: '0.9rem',
+                          fontSize: '0.8rem',
                           border: `1px solid ${badge.text}30`
                       }}>
                           {badge.label}
@@ -415,10 +417,10 @@ const TableManagement = () => {
           })}
         </div>
 
-        {/* --- UNIFIED MODAL --- */}
+        {/* --- UNIFIED MODAL (Responsive Width) --- */}
         {selectedTable && (
           <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
-            <div style={{ backgroundColor: 'white', padding: '30px', borderRadius: '12px', width: '450px', maxWidth: '90%', maxHeight: '90vh', overflowY: 'auto' }}>
+            <div style={{ backgroundColor: 'white', padding: '25px', borderRadius: '12px', width: isMobile ? '95%' : '450px', maxWidth: '95%', maxHeight: '90vh', overflowY: 'auto' }}>
               
               {paymentSuccessData ? (
                   // SUCCESS VIEW
@@ -466,8 +468,8 @@ const TableManagement = () => {
                               {/* --- TABLE MODIFICATION (Only if Available) --- */}
                               {selectedTable.status === 'Available' && (
                                   <div style={{ display: 'flex', gap: '10px', marginBottom: '10px', borderBottom: '1px solid #eee', paddingBottom: '15px' }}>
-                                      <button onClick={handleRenameTable} style={{ flex: 1, padding: '8px', background: '#f0f0f0', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer' }}>✏️ Rename</button>
-                                      <button onClick={handleDeleteTable} style={{ flex: 1, padding: '8px', background: '#FFEBEE', color: '#D32F2F', border: '1px solid #FFCDD2', borderRadius: '4px', cursor: 'pointer' }}>🗑️ Delete</button>
+                                      <button onClick={handleRenameTable} style={{ flex: 1, padding: '10px', background: '#f0f0f0', border: '1px solid #ccc', borderRadius: '4px', cursor: 'pointer' }}>✏️ Rename</button>
+                                      <button onClick={handleDeleteTable} style={{ flex: 1, padding: '10px', background: '#FFEBEE', color: '#D32F2F', border: '1px solid #FFCDD2', borderRadius: '4px', cursor: 'pointer' }}>🗑️ Delete</button>
                                   </div>
                               )}
 
@@ -561,7 +563,7 @@ const TableManagement = () => {
 
                                                <div style={{ margin: '15px 0', opacity: !canSettleBill ? 0.5 : 1 }}>
                                                    <label>Payment Method:</label>
-                                                   <select disabled={!canSettleBill} value={paymentMethod} onChange={(e)=>setPaymentMethod(e.target.value)} style={{ width: '100%', padding: '8px', marginTop: '5px' }}>
+                                                   <select disabled={!canSettleBill} value={paymentMethod} onChange={(e)=>setPaymentMethod(e.target.value)} style={{ width: '100%', padding: '12px', marginTop: '5px', fontSize:'1rem' }}>
                                                        <option value="Cash">Cash</option>
                                                        <option value="Card">Card</option>
                                                        <option value="Online">Online / Khalti</option>
