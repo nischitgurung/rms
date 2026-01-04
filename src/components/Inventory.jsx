@@ -27,7 +27,7 @@ const Inventory = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   
-  // Updated stockForm with SEO fields
+  // stockForm with SEO fields
   const [stockForm, setStockForm] = useState({ 
     itemName: '', 
     category: '', 
@@ -73,13 +73,12 @@ const Inventory = () => {
   const handleSaveStock = async (e) => {
     e.preventDefault();
     const payload = { 
-        itemName: stockForm.itemName, 
+        itemName: stockForm.itemName || '', 
         category: stockForm.category || 'General', 
-        quantity: parseFloat(stockForm.quantity), 
-        unit: stockForm.unit, 
+        quantity: parseFloat(stockForm.quantity) || 0, 
+        unit: stockForm.unit || 'kg', 
         minStock: parseFloat(stockForm.minStock) || 0, 
-        supplierId: stockForm.supplierId,
-        // SEO FIELDS SAVED TO FIREBASE
+        supplierId: stockForm.supplierId || '',
         seoTitle: stockForm.seoTitle || stockForm.itemName,
         seoDescription: stockForm.seoDescription || '',
         slug: stockForm.slug || generateSlug(stockForm.itemName),
@@ -101,7 +100,12 @@ const Inventory = () => {
 
   const handleSaveSupplier = async (e) => {
       e.preventDefault();
-      const payload = { name: supplierForm.name, contact: supplierForm.contact, address: supplierForm.address, email: supplierForm.email };
+      const payload = { 
+        name: supplierForm.name || '', 
+        contact: supplierForm.contact || '', 
+        address: supplierForm.address || '', 
+        email: supplierForm.email || '' 
+      };
       try {
           if (editingId) await updateDoc(doc(db, "suppliers", editingId), payload);
           else await addDoc(collection(db, "suppliers"), payload);
@@ -120,11 +124,11 @@ const Inventory = () => {
       setEditingId(item.id);
       if (type === 'STOCK') {
         setStockForm({ 
-            itemName: item.itemName, 
-            category: item.category, 
-            quantity: item.quantity, 
-            unit: item.unit, 
-            minStock: item.minStock, 
+            itemName: item.itemName || '', 
+            category: item.category || '', 
+            quantity: item.quantity || '', 
+            unit: item.unit || 'kg', 
+            minStock: item.minStock || '', 
             supplierId: item.supplierId || '',
             seoTitle: item.seoTitle || '',
             seoDescription: item.seoDescription || '',
@@ -132,7 +136,12 @@ const Inventory = () => {
             altText: item.altText || ''
         });
       } else {
-        setSupplierForm({ name: item.name, contact: item.contact, address: item.address, email: item.email || '' });
+        setSupplierForm({ 
+            name: item.name || '', 
+            contact: item.contact || '', 
+            address: item.address || '', 
+            email: item.email || '' 
+        });
       }
       setIsModalOpen(true);
   };
@@ -143,6 +152,22 @@ const Inventory = () => {
       setStockForm({ itemName: '', category: '', quantity: '', unit: 'kg', minStock: '', supplierId: '', seoTitle:'', seoDescription:'', slug:'', altText:'' });
       setSupplierForm({ name: '', contact: '', address: '', email: '' });
   };
+
+  // Safe filtering logic
+  const filteredData = (activeTab === 'STOCK' ? inventory : suppliers).filter(item => {
+    const search = searchTerm.toLowerCase();
+    if (activeTab === 'STOCK') {
+      return (
+        (item.itemName || "").toLowerCase().includes(search) || 
+        (item.seoTitle || "").toLowerCase().includes(search) ||
+        (item.category || "").toLowerCase().includes(search)
+      );
+    } else {
+      return (item.name || "").toLowerCase().includes(search);
+    }
+  });
+
+  if (loading) return <div style={{padding: '50px', textAlign: 'center'}}>Loading Inventory...</div>;
 
   return (
     <div style={{ padding: isMobile ? '10px' : '20px', backgroundColor: '#f4f6f8', minHeight: '100vh', fontFamily: 'Arial, sans-serif' }}>
@@ -161,23 +186,36 @@ const Inventory = () => {
 
       {/* Search & Add */}
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', marginBottom: '20px', gap: '10px' }}>
-          <input type="text" placeholder={`Search ${activeTab.toLowerCase()}...`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{...styles.searchInput, width: isMobile ? '100%' : '300px'}} />
+          <input type="text" placeholder={`Search by name or alias...`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{...styles.searchInput, width: isMobile ? '100%' : '300px'}} />
           <button onClick={() => setIsModalOpen(true)} style={{...styles.addBtn, padding: isMobile ? '15px' : '10px 20px'}}>{activeTab === 'STOCK' ? '+ Add Item' : '+ Add Supplier'}</button>
       </div>
 
-      {/* List/Table View (Shortened for brevity - same as your previous logic) */}
+      {/* List/Table View */}
       <div style={styles.tableContainer}>
             <table style={styles.table}>
                 <thead>
                     <tr style={{backgroundColor: '#f1f1f1'}}>
                         <th style={styles.th}>{activeTab === 'STOCK' ? 'Item' : 'Supplier'}</th>
+                        <th style={styles.th}>{activeTab === 'STOCK' ? 'Qty' : 'Contact'}</th>
                         <th style={styles.th}>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {(activeTab === 'STOCK' ? inventory : suppliers).map(item => (
+                    {filteredData.map(item => (
                         <tr key={item.id} style={{ borderBottom: '1px solid #eee' }}>
-                            <td style={styles.td}>{activeTab === 'STOCK' ? item.itemName : item.name}</td>
+                            <td style={styles.td}>
+                                <div><strong>{activeTab === 'STOCK' ? item.itemName : item.name}</strong></div>
+                                {activeTab === 'STOCK' && item.seoTitle && item.seoTitle !== item.itemName && (
+                                    <div style={{fontSize: '0.7rem', color: '#888'}}>Alias: {item.seoTitle}</div>
+                                )}
+                            </td>
+                            <td style={styles.td}>
+                                {activeTab === 'STOCK' ? (
+                                    <span style={{ color: (item.quantity <= item.minStock) ? 'red' : 'inherit', fontWeight: (item.quantity <= item.minStock) ? 'bold' : 'normal' }}>
+                                        {item.quantity} {item.unit}
+                                    </span>
+                                ) : item.contact}
+                            </td>
                             <td style={styles.td}>
                                 <button onClick={() => openEditModal(item, activeTab)} style={styles.editBtn}>Edit</button>
                                 <button onClick={() => handleDelete(item.id, activeTab)} style={styles.deleteBtn}>Delete</button>
@@ -196,7 +234,7 @@ const Inventory = () => {
                   
                   {activeTab === 'STOCK' ? (
                       <form onSubmit={handleSaveStock} style={{display:'grid', gap:'12px'}}>
-                          <label style={styles.label}>Item Name</label>
+                          <label style={styles.label}>Technical Item Name</label>
                           <input 
                             type="text" required 
                             value={stockForm.itemName} 
@@ -205,36 +243,37 @@ const Inventory = () => {
                           />
                           
                           <div style={{display:'flex', gap:'10px'}}>
-                              <div style={{flex:1}}><label style={styles.label}>Qty</label><input type="number" required value={stockForm.quantity} onChange={e => setStockForm({...stockForm, quantity: e.target.value})} style={styles.input} /></div>
+                              <div style={{flex:1}}><label style={styles.label}>Current Qty</label><input type="number" required value={stockForm.quantity} onChange={e => setStockForm({...stockForm, quantity: e.target.value})} style={styles.input} /></div>
+                              <div style={{flex:1}}><label style={styles.label}>Unit</label><input type="text" value={stockForm.unit} onChange={e => setStockForm({...stockForm, unit: e.target.value})} style={styles.input} /></div>
                               <div style={{flex:1}}><label style={styles.label}>Min Alert</label><input type="number" value={stockForm.minStock} onChange={e => setStockForm({...stockForm, minStock: e.target.value})} style={styles.input} /></div>
                           </div>
 
-                          {/* --- SEO CMS SECTION FOR YOUR FRIEND --- */}
+                          {/* SEO CMS SECTION */}
                           <div style={styles.seoBox}>
-                              <h4 style={{margin:'0 0 10px 0', color:'#d32f2f', fontSize:'0.9rem'}}>🔍 SEO STRATEGY PANEL</h4>
+                              <h4 style={{margin:'0 0 10px 0', color:'#d32f2f', fontSize:'0.9rem'}}>🔍 SEARCH OPTIMIZATION</h4>
                               
-                              <label style={styles.label}>SEO Title (Google Blue Link)</label>
+                              <label style={styles.label}>Staff Alias / SEO Title</label>
                               <input 
                                 type="text" 
                                 maxLength="60"
                                 value={stockForm.seoTitle} 
-                                onChange={e => setSeoForm({...stockForm, seoTitle: e.target.value})} 
+                                onChange={e => setStockForm({...stockForm, seoTitle: e.target.value})} 
                                 style={styles.input}
-                                placeholder="Ex: Best Spicy Chicken Momo in Town"
+                                placeholder="Ex: Momo packing, Small parcel boxes"
                               />
                               <div style={styles.counter}>{stockForm.seoTitle.length}/60</div>
 
-                              <label style={styles.label}>Meta Description (Google Summary)</label>
+                              <label style={styles.label}>Quality SOP / Meta Description</label>
                               <textarea 
                                 maxLength="160"
                                 value={stockForm.seoDescription} 
                                 onChange={e => setStockForm({...stockForm, seoDescription: e.target.value})} 
                                 style={{...styles.input, height: '60px'}}
-                                placeholder="Describe the taste, ingredients, and uniqueness..."
+                                placeholder="Instructions on quality check or storage..."
                               />
                               <div style={styles.counter}>{stockForm.seoDescription.length}/160</div>
 
-                              <label style={styles.label}>URL Slug</label>
+                              <label style={styles.label}>URL Slug (Auto)</label>
                               <input type="text" value={stockForm.slug} readOnly style={{...styles.input, backgroundColor:'#f1f1f1'}} />
                           </div>
 
@@ -245,8 +284,12 @@ const Inventory = () => {
                       </form>
                   ) : (
                       <form onSubmit={handleSaveSupplier} style={{display:'grid', gap:'12px'}}>
-                          {/* Supplier form remains same */}
-                          <label style={styles.label}>Name</label><input type="text" required value={supplierForm.name} onChange={e => setSupplierForm({...supplierForm, name: e.target.value})} style={styles.input} />
+                          <label style={styles.label}>Name</label>
+                          <input type="text" required value={supplierForm.name} onChange={e => setSupplierForm({...supplierForm, name: e.target.value})} style={styles.input} />
+                          <label style={styles.label}>Contact</label>
+                          <input type="text" required value={supplierForm.contact} onChange={e => setSupplierForm({...supplierForm, contact: e.target.value})} style={styles.input} />
+                          <label style={styles.label}>Email</label>
+                          <input type="email" value={supplierForm.email} onChange={e => setSupplierForm({...supplierForm, email: e.target.value})} style={styles.input} />
                           <div style={{display:'flex', gap:'10px'}}><button type="button" onClick={closeModal} style={styles.cancelBtn}>Cancel</button><button type="submit" style={styles.saveBtn}>Save</button></div>
                       </form>
                   )}
@@ -262,20 +305,20 @@ const styles = {
     tabBtn: { padding: '12px', border: 'none', cursor: 'pointer', fontWeight: 'bold' },
     searchInput: { padding: '12px', borderRadius: '8px', border: '1px solid #ccc', outline: 'none' },
     addBtn: { backgroundColor: '#D32F2F', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold' },
-    tableContainer: { backgroundColor: 'white', borderRadius: '10px', overflow: 'hidden', marginTop:'20px' },
+    tableContainer: { backgroundColor: 'white', borderRadius: '10px', overflow: 'hidden', marginTop:'20px', border: '1px solid #eee' },
     table: { width: '100%', borderCollapse: 'collapse' },
-    th: { padding: '15px', textAlign: 'left', fontSize: '0.85rem', color: '#555' },
+    th: { padding: '15px', textAlign: 'left', fontSize: '0.85rem', color: '#555', borderBottom: '2px solid #eee' },
     td: { padding: '15px', fontSize: '0.9rem' },
-    editBtn: { backgroundColor: '#E3F2FD', color: '#1565C0', border: 'none', padding: '5px 10px', borderRadius: '4px', marginRight: '5px', cursor: 'pointer' },
-    deleteBtn: { backgroundColor: '#FFEBEE', color: '#C62828', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer' },
+    editBtn: { backgroundColor: '#E3F2FD', color: '#1565C0', border: 'none', padding: '5px 10px', borderRadius: '4px', marginRight: '5px', cursor: 'pointer', fontWeight: 'bold' },
+    deleteBtn: { backgroundColor: '#FFEBEE', color: '#C62828', border: 'none', padding: '5px 10px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' },
     modalOverlay: { position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 },
     modal: { backgroundColor: 'white', padding: '25px', borderRadius: '12px', maxHeight:'90vh', overflowY:'auto' },
     label: { fontSize: '0.7rem', fontWeight: 'bold', color: '#666' },
     input: { width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #ddd', boxSizing: 'border-box' },
     seoBox: { backgroundColor: '#fff5f5', padding: '15px', borderRadius: '8px', border: '1px solid #ffcdd2', marginTop: '10px' },
     counter: { textAlign: 'right', fontSize: '10px', color: '#888', marginTop: '2px' },
-    cancelBtn: { flex: 1, padding: '12px', border: '1px solid #ccc', backgroundColor: 'white', borderRadius: '6px' },
-    saveBtn: { flex: 1, padding: '12px', border: 'none', backgroundColor: 'black', color: 'white', borderRadius: '6px', fontWeight: 'bold' }
+    cancelBtn: { flex: 1, padding: '12px', border: '1px solid #ccc', backgroundColor: 'white', borderRadius: '6px', cursor:'pointer' },
+    saveBtn: { flex: 1, padding: '12px', border: 'none', backgroundColor: 'black', color: 'white', borderRadius: '6px', fontWeight: 'bold', cursor:'pointer' }
 };
 
 export default Inventory;
