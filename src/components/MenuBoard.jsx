@@ -8,10 +8,14 @@ import {
   updateDoc, 
   doc, 
   serverTimestamp, 
-  onSnapshot 
+  onSnapshot,
+  query,     
+  where,
+  increment 
 } from 'firebase/firestore';
-import emailjs from '@emailjs/browser';
 import { Helmet, HelmetProvider } from 'react-helmet-async'; 
+import { useUser } from '../contexts/UserContext'; 
+import ManagerGuard from './ManagerGuard'; 
 
 // --- STYLES HELPER ---
 const styles = {
@@ -24,8 +28,6 @@ const styles = {
     padding: '8px 16px', borderRadius: '20px', border: '1px solid #eee', cursor: 'pointer', whiteSpace: 'nowrap', 
     fontWeight: '600', fontSize: '0.85rem', transition: 'all 0.2s', boxShadow:'0 1px 3px rgba(0,0,0,0.05)' 
   },
-  
-  // OPTIMIZED CARD STYLING
   itemCard: { 
     backgroundColor: 'white', 
     borderRadius: '12px', 
@@ -40,20 +42,14 @@ const styles = {
     boxSizing: 'border-box',
     position: 'relative'
   },
-  
-  // SINGLE IMAGE
   itemImage: {
     width: '100%',
-    // Height is dynamic based on device
     objectFit: 'cover', 
     backgroundColor: '#f8f9fa',
     flexShrink: 0
   },
-
-  // COMBO TEXT BOX (Replaces Image Grid)
   comboTextBox: {
     width: '100%',
-    // Height is dynamic based on device
     backgroundColor: '#E3F2FD', 
     color: '#1565C0',
     display: 'flex',
@@ -68,7 +64,6 @@ const styles = {
     textAlign: 'center',
     lineHeight: '1.4'
   },
-
   itemInfo: {
     padding: '10px 12px',
     textAlign: 'left',
@@ -96,8 +91,6 @@ const styles = {
     marginTop: 'auto', 
     display: 'block'
   },
-  
-  // MODAL STYLING
   modalOverlay: { 
     position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.6)', 
     display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 2000, backdropFilter: 'blur(3px)' 
@@ -114,8 +107,6 @@ const styles = {
     display: 'flex',       
     flexDirection: 'column' 
   },
-  
-  // COMBO BADGE
   comboBadge: {
     position: 'absolute',
     top: '8px',
@@ -129,8 +120,6 @@ const styles = {
     zIndex: 10,
     boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
   },
-
-  // ORIGINAL BLACK BUTTON STYLE
   sendBtn: { 
     width: '100%', 
     padding: '16px', 
@@ -144,8 +133,18 @@ const styles = {
     letterSpacing:'0.5px',
     boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
   },
-
-  // FIX: Added boxSizing: 'border-box' so padding doesn't overflow width
+  voidBtn: { 
+    flex: 1,
+    padding: '12px', 
+    backgroundColor: '#FFF0F0', 
+    color: '#D32F2F', 
+    border: '1px solid #FFCDD2', 
+    borderRadius: '8px', 
+    cursor: 'pointer', 
+    fontWeight: 'bold', 
+    fontSize: '0.8rem', 
+    marginRight: '10px'
+  },
   searchInput: { 
     width: '100%', 
     padding: '12px 16px', 
@@ -162,86 +161,117 @@ const styles = {
 // ==========================================
 // 1. CART VIEW COMPONENT
 // ==========================================
-const CartView = ({ cart, initialTableName, initialTableId, handleSendClick, updateQty, removeItem, isMobile, detectedCombos, applyCombo }) => (
-  <div style={{ 
-    width: isMobile ? '100%' : '340px', 
-    height: isMobile ? 'calc(100vh - 60px)' : '100vh', 
-    backgroundColor: 'white', 
-    borderRight: isMobile ? 'none' : '1px solid #eee', 
-    display: 'flex', flexDirection: 'column' 
-  }}>
-    <div style={{ padding: '20px', borderBottom: '1px solid #eee' }}>
-      <h2 style={{ margin: '0 0 5px 0', fontSize: '1.3rem', color: '#111' }}>Current Order</h2>
-      <div style={{ fontSize: '0.9rem', color: '#666' }}>
-        Table: <strong style={{color:'#000'}}>{initialTableName === 'Walk-in' ? 'Unassigned' : initialTableName}</strong>
-      </div>
-    </div>
+const CartView = ({ 
+  cart, initialTableName, initialTableId, handleSendClick, updateQty, removeItem, 
+  isMobile, detectedCombos, applyCombo, onVoidClick, onDiscountClick, discountPercent 
+}) => {
+  // Calculate Totals for Display
+  const subtotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
+  const discountAmount = (subtotal * discountPercent) / 100;
+  const finalTotal = subtotal - discountAmount;
 
-    {detectedCombos.length > 0 && (
-      <div style={{ backgroundColor: '#E3F2FD', padding: '10px 15px', borderBottom: '1px solid #BBDEFB' }}>
-        {detectedCombos.map(combo => (
-          <div key={combo.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <div>
-                <span style={{ fontSize: '0.8rem', color: '#1565C0', fontWeight: 'bold', display:'block' }}>✨ Deal Found!</span>
-                <span style={{ fontSize: '0.75rem', color: '#555' }}>{combo.name}</span>
+  return (
+    <div style={{ 
+      width: isMobile ? '100%' : '340px', 
+      height: isMobile ? 'calc(100vh - 60px)' : '100vh', 
+      backgroundColor: 'white', 
+      borderRight: isMobile ? 'none' : '1px solid #eee', 
+      display: 'flex', flexDirection: 'column' 
+    }}>
+      <div style={{ padding: '20px', borderBottom: '1px solid #eee' }}>
+        <h2 style={{ margin: '0 0 5px 0', fontSize: '1.3rem', color: '#111' }}>Current Order</h2>
+        <div style={{ fontSize: '0.9rem', color: '#666' }}>
+          Table: <strong style={{color:'#000'}}>{initialTableName === 'Walk-in' ? 'Unassigned' : initialTableName}</strong>
+        </div>
+      </div>
+
+      {detectedCombos.length > 0 && (
+        <div style={{ backgroundColor: '#E3F2FD', padding: '10px 15px', borderBottom: '1px solid #BBDEFB' }}>
+          {detectedCombos.map(combo => (
+            <div key={combo.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div>
+                  <span style={{ fontSize: '0.8rem', color: '#1565C0', fontWeight: 'bold', display:'block' }}>✨ Deal Found!</span>
+                  <span style={{ fontSize: '0.75rem', color: '#555' }}>{combo.name}</span>
+              </div>
+              <button 
+                  onClick={() => applyCombo(combo)} 
+                  style={{ padding: '6px 12px', backgroundColor: '#1976D2', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight:'bold' }}
+              >
+                  Apply
+              </button>
             </div>
-            <button 
-                onClick={() => applyCombo(combo)} 
-                style={{ padding: '6px 12px', backgroundColor: '#1976D2', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight:'bold' }}
-            >
-                Apply
-            </button>
+          ))}
+        </div>
+      )}
+      
+      <div style={{ flex: 1, overflowY: 'auto', padding: '15px', paddingBottom: isMobile ? '100px' : '20px' }}>
+        {cart.length === 0 && <div style={{padding:'40px 20px', textAlign:'center', color:'#ccc', fontStyle:'italic'}}>Cart is empty</div>}
+        {cart.map((item) => (
+          <div key={item.cartId} style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px dashed #eee' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom:'5px' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: '600', color: '#333', fontSize:'0.95rem' }}>
+                  {item.isCombo ? '🎁 ' : ''}{item.name} 
+                  <span style={{fontSize:'0.85rem', color:'#888', marginLeft:'5px'}}>x{item.qty}</span>
+                </div>
+                {item.selectedExtras?.map(ex => (
+                  <div key={ex.id} style={{ fontSize: '0.8rem', color: '#666' }}>+ {ex.name}</div>
+                ))}
+              </div>
+              <div style={{ fontWeight: '700', color: '#333', marginLeft: '10px', fontSize:'0.95rem' }}>
+                Rs. {(item.price * item.qty).toFixed(0)}
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
+              <button onClick={() => updateQty(item.cartId, -1)} style={styles.qtyBtn}>-</button>
+              <span style={{ fontSize:'0.9rem', fontWeight:'bold', minWidth:'20px', textAlign:'center' }}>{item.qty}</span>
+              <button onClick={() => updateQty(item.cartId, 1)} style={styles.qtyBtn}>+</button>
+              <button onClick={() => removeItem(item.cartId)} style={{ marginLeft: '10px', background: 'none', border: 'none', cursor: 'pointer', fontSize:'1rem', opacity: 0.5 }}>🗑️</button>
+            </div>
           </div>
         ))}
       </div>
-    )}
-    
-    <div style={{ flex: 1, overflowY: 'auto', padding: '15px', paddingBottom: isMobile ? '100px' : '20px' }}>
-      {cart.length === 0 && <div style={{padding:'40px 20px', textAlign:'center', color:'#ccc', fontStyle:'italic'}}>Cart is empty</div>}
-      {cart.map((item) => (
-        <div key={item.cartId} style={{ marginBottom: '15px', paddingBottom: '15px', borderBottom: '1px dashed #eee' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom:'5px' }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: '600', color: '#333', fontSize:'0.95rem' }}>
-                {item.isCombo ? '🎁 ' : ''}{item.name} 
-                <span style={{fontSize:'0.85rem', color:'#888', marginLeft:'5px'}}>x{item.qty}</span>
-              </div>
-              {item.selectedExtras?.map(ex => (
-                <div key={ex.id} style={{ fontSize: '0.8rem', color: '#666' }}>+ {ex.name}</div>
-              ))}
-            </div>
-            <div style={{ fontWeight: '700', color: '#333', marginLeft: '10px', fontSize:'0.95rem' }}>
-              Rs. {(item.price * item.qty).toFixed(0)}
-            </div>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '10px' }}>
-            <button onClick={() => updateQty(item.cartId, -1)} style={styles.qtyBtn}>-</button>
-            <span style={{ fontSize:'0.9rem', fontWeight:'bold', minWidth:'20px', textAlign:'center' }}>{item.qty}</span>
-            <button onClick={() => updateQty(item.cartId, 1)} style={styles.qtyBtn}>+</button>
-            <button onClick={() => removeItem(item.cartId)} style={{ marginLeft: '10px', background: 'none', border: 'none', cursor: 'pointer', fontSize:'1rem', opacity: 0.5 }}>🗑️</button>
-          </div>
-        </div>
-      ))}
-    </div>
 
-    <div style={{ 
-        padding: '20px', 
-        backgroundColor: '#fff', 
-        borderTop: '1px solid #eee', 
-        position: isMobile ? 'absolute' : 'relative',
-        bottom: 0, left: 0, right: 0, zIndex: 10
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '15px', color:'#111' }}>
-        <span>Total</span>
-        <span>Rs. {cart.reduce((acc, item) => acc + (item.price * item.qty), 0).toFixed(2)}</span>
+      <div style={{ 
+          padding: '20px', 
+          backgroundColor: '#fff', 
+          borderTop: '1px solid #eee', 
+          position: isMobile ? 'absolute' : 'relative',
+          bottom: 0, left: 0, right: 0, zIndex: 10
+      }}>
+        {/* PRICE BREAKDOWN */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom:'5px', color:'#666', fontSize:'0.9rem' }}>
+          <span>Subtotal</span>
+          <span>Rs. {subtotal.toFixed(2)}</span>
+        </div>
+        
+        {discountPercent > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom:'10px', color:'#D32F2F', fontSize:'0.9rem' }}>
+                <span>Discount ({discountPercent}%)</span>
+                <span>- Rs. {discountAmount.toFixed(2)}</span>
+            </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '1.2rem', fontWeight: 'bold', marginBottom: '15px', color:'#111' }}>
+          <span>Total</span>
+          <span>Rs. {finalTotal.toFixed(2)}</span>
+        </div>
+        
+        {/* RESTRICTED BUTTONS */}
+        {cart.length > 0 && (
+            <div style={{display:'flex', marginBottom:'15px'}}>
+                <button onClick={onVoidClick} style={styles.voidBtn}>VOID ORDER</button>
+                <button onClick={onDiscountClick} style={{...styles.voidBtn, backgroundColor:'#E8F5E9', color:'#2E7D32', border:'1px solid #C8E6C9'}}>DISCOUNT</button>
+            </div>
+        )}
+
+        <button onClick={handleSendClick} style={styles.sendBtn}>
+          {initialTableId === 'Walk-in' ? 'SELECT TABLE & SEND' : 'SEND TO KITCHEN'}
+        </button>
       </div>
-      
-      <button onClick={handleSendClick} style={styles.sendBtn}>
-        {initialTableId === 'Walk-in' ? 'SELECT TABLE & SEND' : 'SEND TO KITCHEN'}
-      </button>
     </div>
-  </div>
-);
+  );
+};
 
 // ==========================================
 // 2. MENU VIEW COMPONENT 
@@ -271,13 +301,11 @@ const MenuView = ({ categories, activeCategory, setActiveCategory, items, handle
         </div>
       </div>
       
-      {/* OPTIMIZED GRID */}
       <div style={{ 
         flex: 1, 
         padding: isMobile ? '10px' : '20px', 
         overflowY: 'auto', 
         display: 'grid', 
-        // Mobile: 2 Columns | Desktop: Auto-fill minimum 220px
         gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(220px, 1fr))', 
         gap: isMobile ? '10px' : '20px', 
         alignContent: 'start',
@@ -295,7 +323,6 @@ const MenuView = ({ categories, activeCategory, setActiveCategory, items, handle
             
             {item.isCombo && <div style={styles.comboBadge}>DEAL</div>}
 
-            {/* COMBO: TEXT ONLY, NO PICTURE */}
             {item.isCombo ? (
                 <div style={{...styles.comboTextBox, height: isMobile ? '110px' : '150px'}}>
                     {item.comboItems && item.comboItems.slice(0,4).map((sub, i) => (
@@ -372,6 +399,8 @@ const MenuBoard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { tableId: initialTableId, tableName: initialTableName } = location.state || { tableId: 'Walk-in', tableName: 'Walk-in' };
+  
+  const { restaurantId } = useUser(); 
 
   // DATA STATES
   const [categories, setCategories] = useState([]);
@@ -392,34 +421,41 @@ const MenuBoard = () => {
   const [selectedExtras, setSelectedExtras] = useState([]); 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 1024);
   const [mobileTab, setMobileTab] = useState('menu'); 
+  
+  // MANAGER GUARD STATES
+  const [showGuard, setShowGuard] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null); 
+  
+  // --- DISCOUNT STATE ---
+  const [discountPercent, setDiscountPercent] = useState(0);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
     window.addEventListener('resize', handleResize);
 
+    if (!restaurantId) return;
+
     const fetchData = async () => {
       try {
-        // 1. Fetch Categories
-        const catSnap = await getDocs(collection(db, "categories"));
+        const qCat = query(collection(db, "categories"), where("userId", "==", restaurantId));
+        const catSnap = await getDocs(qCat);
         const fetchedCategories = catSnap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => (a.sortOrder || 0) - (b.sortOrder || 0));
         setCategories(fetchedCategories);
 
-        // 2. Fetch Menu Items (Needed to map images to combos)
-        const itemSnap = await getDocs(collection(db, "menu_items"));
+        const qItems = query(collection(db, "menu_items"), where("userId", "==", restaurantId));
+        const itemSnap = await getDocs(qItems);
         const fetchedMenuItems = itemSnap.docs.map(d => ({id: d.id, ...d.data()}));
         
-        // Create a quick lookup map for images: ID -> ImageURL
         const imageMap = {};
         fetchedMenuItems.forEach(i => { imageMap[i.id] = i.imageUrl; });
 
-        // 3. Fetch Combos & Enrich with Images
-        const comboSnap = await getDocs(collection(db, "combos")); 
+        const qCombos = query(collection(db, "combos"), where("userId", "==", restaurantId));
+        const comboSnap = await getDocs(qCombos); 
         const fetchedCombos = comboSnap.docs.map(d => {
             const data = d.data();
-            // Enrich contents with images
             const enrichedContents = (data.comboItems || []).map(ci => ({
                 ...ci,
-                imageUrl: imageMap[ci.id] || null // Map ID to URL
+                imageUrl: imageMap[ci.id] || null 
             }));
 
             return {
@@ -431,12 +467,11 @@ const MenuBoard = () => {
             };
         });
 
-        // 4. Merge All Items
         setItems([...fetchedMenuItems, ...fetchedCombos]); 
         setCombos(fetchedCombos); 
         
-        // 5. Modifiers
-        const modSnap = await getDocs(collection(db, "modifiers"));
+        const qMods = query(collection(db, "modifiers"), where("userId", "==", restaurantId));
+        const modSnap = await getDocs(qMods);
         setModifiers(modSnap.docs.map(d => ({id: d.id, ...d.data()})).filter(m => m.isAvailable)); 
         
         setLoading(false);
@@ -444,25 +479,76 @@ const MenuBoard = () => {
     };
     fetchData();
 
-    onSnapshot(collection(db, "tables"), (snapshot) => {
+    const qTables = query(collection(db, "tables"), where("userId", "==", restaurantId));
+    const unsubTables = onSnapshot(qTables, (snapshot) => {
         setTables(snapshot.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })));
     });
 
-    onSnapshot(collection(db, "inventory"), (snap) => setInventoryItems(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
+    const qInv = query(collection(db, "inventory"), where("userId", "==", restaurantId));
+    const unsubInv = onSnapshot(qInv, (snap) => setInventoryItems(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
 
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+    return () => {
+        window.removeEventListener('resize', handleResize);
+        unsubTables();
+        unsubInv();
+    };
+  }, [restaurantId]);
 
+  // --- FINALIZE ORDER WITH DISCOUNT ---
   const finalizeOrder = async (tId, tName) => {
     if (cart.length === 0) return alert("Cart is empty");
+    
     try {
-      const totalAmount = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
-      await addDoc(collection(db, "orders"), { items: cart, totalAmount, status: "PENDING", tableId: tName, tableDocId: tId, createdAt: serverTimestamp() });
+      // 1. Calculate Totals
+      const subtotal = cart.reduce((acc, item) => acc + (item.price * item.qty), 0);
+      const discountAmount = (subtotal * discountPercent) / 100;
+      const finalTotal = subtotal - discountAmount;
+      
+      // 2. Create Order (With Discount fields)
+      await addDoc(collection(db, "orders"), { 
+          items: cart, 
+          subtotal: subtotal,
+          discount: discountAmount,
+          discountPercent: discountPercent,
+          totalAmount: finalTotal, // Final price
+          status: "PENDING", 
+          tableId: tName, 
+          tableDocId: tId, 
+          userId: restaurantId,
+          createdAt: serverTimestamp() 
+      });
+
+      // 3. AUTOMATIC INVENTORY DEDUCTION 
+      for (const cartItem of cart) {
+          const menuItem = items.find(i => i.id === cartItem.id);
+          
+          if (menuItem && menuItem.recipe && menuItem.recipe.length > 0) {
+              for (const ingredient of menuItem.recipe) {
+                  const qtyToDeduct = (parseFloat(ingredient.qty) || 0) * cartItem.qty;
+                  
+                  if (ingredient.stockId && qtyToDeduct > 0) {
+                      const stockRef = doc(db, "inventory", ingredient.stockId);
+                      
+                      await updateDoc(stockRef, {
+                          quantity: increment(-qtyToDeduct)
+                      });
+                  }
+              }
+          }
+      }
+
+      // 4. Update Table Status
       if(tId && tId !== 'Walk-in') await updateDoc(doc(db, "tables", tId), { status: "Occupied" });
       
-      alert(`✅ Order sent for ${tName}`);
-      setCart([]); navigate('/tables'); 
-    } catch (error) { alert("System Error: Order failed"); }
+      alert(`✅ Order sent! Discount: ${discountPercent}% applied.`);
+      setCart([]); 
+      setDiscountPercent(0); // Reset
+      navigate('/tables'); 
+    
+    } catch (error) { 
+        console.error("Order Failed:", error);
+        alert("System Error: Order failed. Check console."); 
+    }
   };
 
   const handleItemClick = (item) => { setSelectedItem(item); setSelectedExtras([]); setIsModalOpen(true); };
@@ -494,7 +580,6 @@ const MenuBoard = () => {
     setShowTableSelector(false);
   };
 
-  // --- COMBO DETECTION LOGIC ---
   const checkAvailableCombos = () => {
       if (!combos || combos.length === 0 || cart.length === 0) return [];
       const detected = [];
@@ -537,6 +622,37 @@ const MenuBoard = () => {
       setCart(newCart);
   };
 
+  const handleVoidClick = () => {
+      setPendingAction('VOID');
+      setShowGuard(true);
+  };
+
+  const handleDiscountClick = () => {
+      setPendingAction('DISCOUNT');
+      setShowGuard(true);
+  };
+
+  // --- UPDATED GUARD SUCCESS FOR DISCOUNT ---
+  const onGuardSuccess = () => {
+      if (pendingAction === 'VOID') {
+          setCart([]);
+          setDiscountPercent(0);
+          alert("Order Voided Successfully.");
+      } else if (pendingAction === 'DISCOUNT') {
+          // Ask for percentage
+          const input = prompt("Enter Discount Percentage (e.g. 10 for 10%):");
+          const value = parseFloat(input);
+          
+          if (!isNaN(value) && value >= 0 && value <= 100) {
+              setDiscountPercent(value);
+          } else {
+              alert("Invalid Discount Percentage");
+          }
+      }
+      setShowGuard(false);
+      setPendingAction(null);
+  };
+
   if (loading) return <div style={{padding: 50, textAlign:'center'}}>Loading...</div>;
 
   const structuredData = {
@@ -563,14 +679,42 @@ const MenuBoard = () => {
       <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', height: '100vh', backgroundColor: '#f5f5f5', overflow: 'hidden', fontFamily: 'Arial, sans-serif' }}>
         {!isMobile ? (
             <>
-              <CartView cart={cart} initialTableName={initialTableName} initialTableId={initialTableId} handleSendClick={handleSendClick} updateQty={updateQty} removeItem={removeItem} isMobile={false} detectedCombos={checkAvailableCombos()} applyCombo={applyCombo} />
+              <CartView 
+                cart={cart} 
+                initialTableName={initialTableName} 
+                initialTableId={initialTableId} 
+                handleSendClick={handleSendClick} 
+                updateQty={updateQty} 
+                removeItem={removeItem} 
+                isMobile={false} 
+                detectedCombos={checkAvailableCombos()} 
+                applyCombo={applyCombo} 
+                onVoidClick={handleVoidClick}
+                onDiscountClick={handleDiscountClick}
+                discountPercent={discountPercent} // <--- Pass the percent
+              />
               <MenuView categories={categories} activeCategory={activeCategory} setActiveCategory={setActiveCategory} items={items} handleItemClick={handleItemClick} searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
               <SidebarView navigate={navigate} isMobile={false} />
             </>
         ) : (
             <div style={{ flex: 1, overflow: 'hidden' }}>
                 {mobileTab === 'menu' && <MenuView categories={categories} activeCategory={activeCategory} setActiveCategory={setActiveCategory} items={items} handleItemClick={handleItemClick} isMobile={true} searchTerm={searchTerm} setSearchTerm={setSearchTerm} />}
-                {mobileTab === 'cart' && <CartView cart={cart} initialTableName={initialTableName} initialTableId={initialTableId} handleSendClick={handleSendClick} updateQty={updateQty} removeItem={removeItem} isMobile={true} detectedCombos={checkAvailableCombos()} applyCombo={applyCombo} />}
+                {mobileTab === 'cart' && (
+                    <CartView 
+                        cart={cart} 
+                        initialTableName={initialTableName} 
+                        initialTableId={initialTableId} 
+                        handleSendClick={handleSendClick} 
+                        updateQty={updateQty} 
+                        removeItem={removeItem} 
+                        isMobile={true} 
+                        detectedCombos={checkAvailableCombos()} 
+                        applyCombo={applyCombo}
+                        onVoidClick={handleVoidClick}
+                        onDiscountClick={handleDiscountClick}
+                        discountPercent={discountPercent}
+                    />
+                )}
                 {mobileTab === 'options' && <SidebarView navigate={navigate} isMobile={true} />}
             </div>
         )}
@@ -583,12 +727,18 @@ const MenuBoard = () => {
             </div>
         )}
 
-        {/* ITEM MODAL */}
+        {showGuard && (
+            <ManagerGuard 
+                actionName={pendingAction} 
+                onSuccess={onGuardSuccess} 
+                onClose={() => setShowGuard(false)} 
+            />
+        )}
+
+        {/* ITEM MODAL (Same as before) */}
         {isModalOpen && selectedItem && (
           <div style={styles.modalOverlay}>
             <div style={styles.modal}>
-              
-              {/* IMAGE HEADER - REMOVED IMAGE FOR COMBOS */}
               {!selectedItem.isCombo && (
                   <div style={{width:'100%', height:'200px', position:'relative', backgroundColor:'#eee'}}>
                       <img 
@@ -602,15 +752,12 @@ const MenuBoard = () => {
                   </div>
               )}
               
-              {/* CONTENT AREA */}
               <div style={{padding:'20px', textAlign:'left', flex: 1, display:'flex', flexDirection:'column'}}>
                   <div style={{display:'flex', justifyContent:'space-between', alignItems:'start'}}>
                       <h2 style={{margin:'0 0 10px 0', color:'#2c3e50', fontSize:'1.4rem'}}>{selectedItem.name}</h2>
-                      {/* Show Price here if it's a Combo since header is gone */}
                       {selectedItem.isCombo && <h2 style={{margin:'0', color:'#27ae60', fontSize:'1.4rem'}}>Rs. {selectedItem.price}</h2>}
                   </div>
 
-                  {/* COMBO CONTENTS LIST */}
                   {selectedItem.isCombo && selectedItem.comboItems && (
                       <div style={{backgroundColor:'#E3F2FD', padding:'12px', borderRadius:'10px', marginBottom:'15px'}}>
                           <h4 style={{margin:'0 0 5px 0', fontSize:'0.9rem', color:'#1565C0', textTransform:'uppercase', letterSpacing:'0.5px'}}>Includes:</h4>
@@ -622,14 +769,12 @@ const MenuBoard = () => {
                       </div>
                   )}
 
-                  {/* FIX: ADDED PLATING GUIDE (ALT TEXT) */}
                   {selectedItem.altText && (
                     <div style={{ fontSize: '0.85rem', fontStyle: 'italic', color: '#555', marginBottom: '15px', borderLeft: '3px solid #ccc', paddingLeft: '10px' }}>
                       👨‍🍳 <strong>Plating:</strong> {selectedItem.altText}
                     </div>
                   )}
 
-                  {/* SEO Note */}
                   {selectedItem.seoDescription && (
                     <div style={{ backgroundColor: '#FFF3E0', padding: '10px', borderRadius: '8px', marginBottom: '15px', borderLeft: '4px solid #FF9800', fontSize: '0.9rem', color:'#555' }}>
                       {selectedItem.seoDescription}
@@ -654,7 +799,6 @@ const MenuBoard = () => {
           </div>
         )}
 
-        {/* TABLE SELECTOR MODAL */}
         {showTableSelector && (
           <div style={{ ...styles.modalOverlay, zIndex: 3000 }}>
             <div style={{ ...styles.modal, width: '90%', maxWidth: '600px', padding:'20px' }}>

@@ -1,7 +1,18 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { 
+  collection, 
+  getDocs, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  serverTimestamp,
+  query, // <--- Added
+  where  // <--- Added
+} from 'firebase/firestore';
+import { useUser } from '../contexts/UserContext'; // <--- 1. NEW IMPORT
 
 // HELPER: Auto-creates URL-friendly slugs
 const generateSlug = (text) => {
@@ -10,6 +21,7 @@ const generateSlug = (text) => {
 
 const AdminMenu = () => {
   const navigate = useNavigate();
+  const { restaurantId } = useUser(); // <--- 2. GET RESTAURANT ID
   
   // --- STATE ---
   const [items, setItems] = useState([]);
@@ -35,17 +47,23 @@ const AdminMenu = () => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
 
+    if (!restaurantId) return; // <--- 3. GUARD CLAUSE
+
     const fetchData = async () => {
         try {
-            const catSnap = await getDocs(collection(db, "categories"));
+            // 4. FILTER EVERYTHING BY RESTAURANT ID
+            const qCat = query(collection(db, "categories"), where("userId", "==", restaurantId));
+            const catSnap = await getDocs(qCat);
             const fetchedCats = catSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setCategories(fetchedCats);
 
-            const itemSnap = await getDocs(collection(db, "menu_items"));
+            const qItems = query(collection(db, "menu_items"), where("userId", "==", restaurantId));
+            const itemSnap = await getDocs(qItems);
             const fetchedItems = itemSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setItems(fetchedItems);
 
-            const orderSnap = await getDocs(collection(db, "orders"));
+            const qOrders = query(collection(db, "orders"), where("userId", "==", restaurantId));
+            const orderSnap = await getDocs(qOrders);
             const fetchedOrders = orderSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setOrders(fetchedOrders);
 
@@ -58,7 +76,7 @@ const AdminMenu = () => {
     };
     fetchData();
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [restaurantId]); // <--- 5. ADD DEPENDENCY
 
   // --- IMAGE ADJUSTER & CLOUDINARY UPLOAD LOGIC ---
   const handleFileUpload = async (file) => {
@@ -195,7 +213,12 @@ const AdminMenu = () => {
             await updateDoc(doc(db, "menu_items", editingId), payload);
             alert("Dish Updated Successfully!");
         } else {
-            await addDoc(collection(db, "menu_items"), { ...payload, createdAt: serverTimestamp() });
+            // 6. TAG NEW ITEMS WITH RESTAURANT ID
+            await addDoc(collection(db, "menu_items"), { 
+                ...payload, 
+                userId: restaurantId, // <--- IMPORTANT
+                createdAt: serverTimestamp() 
+            });
             alert("Dish Added Successfully!");
         }
 
@@ -203,7 +226,9 @@ const AdminMenu = () => {
         setEditingId(null);
         setShowForm(false);
         
-        const refreshSnap = await getDocs(collection(db, "menu_items"));
+        // Refresh Data with Filter
+        const qItems = query(collection(db, "menu_items"), where("userId", "==", restaurantId));
+        const refreshSnap = await getDocs(qItems);
         const refreshItems = refreshSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setItems(refreshItems);
         calculateStats(refreshItems, orders, categories); 

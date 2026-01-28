@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, where } from 'firebase/firestore'; // <--- Added 'where'
+import { useUser } from '../contexts/UserContext'; // <--- 1. NEW IMPORT
 
 const SalesPurchases = () => {
   const navigate = useNavigate();
+  const { restaurantId } = useUser(); // <--- 2. GET RESTAURANT ID
 
   // --- STATE ---
   const [sales, setSales] = useState([]);
@@ -27,7 +29,17 @@ const SalesPurchases = () => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
     
-    const q = query(collection(db, "transactions"), orderBy("date", "desc"));
+    // <--- 3. GUARD CLAUSE
+    if (!restaurantId) return;
+
+    // <--- 4. UPDATED QUERY: Filter by Restaurant ID + Sort by Date
+    // NOTE: This might require a new Index. Check console for link.
+    const q = query(
+        collection(db, "transactions"), 
+        where("userId", "==", restaurantId), // Filter by Restaurant
+        orderBy("date", "desc")
+    );
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
         const allData = snapshot.docs.map(doc => {
             const d = doc.data();
@@ -46,7 +58,7 @@ const SalesPurchases = () => {
         unsubscribe();
         window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [restaurantId]); // <--- 5. ADD DEPENDENCY
 
   const totalSales = sales.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
   const totalPurchases = purchases.reduce((sum, item) => sum + parseFloat(item.amount || 0), 0);
@@ -61,6 +73,7 @@ const SalesPurchases = () => {
           const now = new Date();
           selectedDate.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
 
+          // <--- 6. TAG NEW PURCHASE WITH RESTAURANT ID
           await addDoc(collection(db, "transactions"), {
               type: "EXPENSE",
               amount: parseFloat(purchaseForm.amount),
@@ -68,6 +81,7 @@ const SalesPurchases = () => {
               vendor: purchaseForm.vendor,
               paymentMethod: purchaseForm.paymentMethod,
               date: selectedDate,
+              userId: restaurantId, // <--- IMPORTANT
               createdAt: serverTimestamp()
           });
 

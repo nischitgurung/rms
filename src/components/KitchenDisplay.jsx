@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, query, orderBy, where } from 'firebase/firestore'; 
+import { useUser } from '../contexts/UserContext'; 
 
 const KitchenDisplay = () => {
   const navigate = useNavigate();
+  const { restaurantId } = useUser(); 
+
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   
@@ -17,8 +20,17 @@ const KitchenDisplay = () => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
     window.addEventListener('resize', handleResize);
 
-    // Database Listener
-    const q = query(collection(db, "orders"), orderBy("createdAt", "asc"));
+    // GUARD CLAUSE
+    if (!restaurantId) return;
+
+    // UPDATED QUERY: Filter by Restaurant ID + Sort by Time
+    // NOTE: This will trigger a NEW "Index Required" error in console. Click the link to fix it.
+    const q = query(
+        collection(db, "orders"), 
+        where("userId", "==", restaurantId), 
+        orderBy("createdAt", "asc")
+    );
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const allOrders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
@@ -37,7 +49,7 @@ const KitchenDisplay = () => {
         window.removeEventListener('resize', handleResize);
         unsubscribe();
     };
-  }, []);
+  }, [restaurantId]); 
 
   const updateStatus = async (orderId, newStatus) => {
     try {

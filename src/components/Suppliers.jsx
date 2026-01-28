@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, where } from 'firebase/firestore'; // <--- Added query, where
+import { useUser } from '../contexts/UserContext'; // <--- 1. NEW IMPORT
 
 const Suppliers = () => {
   const navigate = useNavigate();
+  const { restaurantId } = useUser(); // <--- 2. GET RESTAURANT ID
 
   // --- STATE ---
   const [suppliers, setSuppliers] = useState([]);
@@ -27,7 +29,12 @@ const Suppliers = () => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
     
-    const unsubscribe = onSnapshot(collection(db, "suppliers"), (snapshot) => {
+    // <--- 3. GUARD CLAUSE
+    if (!restaurantId) return;
+
+    // <--- 4. FILTER SUPPLIERS BY RESTAURANT ID
+    const qSuppliers = query(collection(db, "suppliers"), where("userId", "==", restaurantId));
+    const unsubscribe = onSnapshot(qSuppliers, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setSuppliers(data.sort((a, b) => (a.name || "").localeCompare(b.name || "")));
       setLoading(false);
@@ -37,7 +44,7 @@ const Suppliers = () => {
         unsubscribe();
         window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [restaurantId]); // <--- 5. ADD DEPENDENCY
 
   // --- HANDLERS ---
   const handleSave = async (e) => {
@@ -57,7 +64,12 @@ const Suppliers = () => {
         await updateDoc(doc(db, "suppliers", editingId), payload);
         alert("Supplier Updated!");
       } else {
-        await addDoc(collection(db, "suppliers"), { ...payload, createdAt: serverTimestamp() });
+        // <--- 6. TAG NEW SUPPLIER WITH RESTAURANT ID
+        await addDoc(collection(db, "suppliers"), { 
+            ...payload, 
+            userId: restaurantId, // <--- IMPORTANT
+            createdAt: serverTimestamp() 
+        });
         alert("New Supplier Added!");
       }
       closeModal();

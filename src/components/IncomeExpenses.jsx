@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
+import { useUser } from '../contexts/UserContext'; // <--- 1. NEW IMPORT
 
 const IncomeExpenses = () => {
   const navigate = useNavigate();
+  const { restaurantId } = useUser(); // <--- 2. GET RESTAURANT ID
 
   // --- STATE ---
   const [transactions, setTransactions] = useState([]);
@@ -25,13 +27,19 @@ const IncomeExpenses = () => {
 
   // --- 1. FETCH DATA (By Month) ---
   useEffect(() => {
+    // <--- 3. GUARD CLAUSE
+    if (!restaurantId) return;
+
     setLoading(true);
     const [year, month] = selectedMonth.split('-');
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59);
 
+    // <--- 4. UPDATED QUERY: Filter by Restaurant ID + Date Range
+    // NOTE: This might require a new Index. Check console for link.
     const q = query(
         collection(db, "transactions"),
+        where("userId", "==", restaurantId), // Filter by Restaurant
         where("date", ">=", startDate),
         where("date", "<=", endDate),
         orderBy("date", "desc")
@@ -51,7 +59,7 @@ const IncomeExpenses = () => {
     });
 
     return () => unsubscribe();
-  }, [selectedMonth]);
+  }, [selectedMonth, restaurantId]); // <--- 5. ADD DEPENDENCY
 
   // --- 2. CALCULATIONS ---
   const incomeList = transactions.filter(t => t.type === 'INCOME');
@@ -71,6 +79,7 @@ const IncomeExpenses = () => {
       if(!expenseForm.amount || !expenseForm.description) return;
 
       try {
+          // <--- 6. TAG NEW EXPENSE WITH RESTAURANT ID
           await addDoc(collection(db, "transactions"), {
               type: "EXPENSE",
               amount: parseFloat(expenseForm.amount),
@@ -78,6 +87,7 @@ const IncomeExpenses = () => {
               category: expenseForm.category,
               paymentMethod: "Cash",
               date: new Date(),
+              userId: restaurantId, // <--- IMPORTANT
               createdAt: serverTimestamp()
           });
           setShowExpenseForm(false);

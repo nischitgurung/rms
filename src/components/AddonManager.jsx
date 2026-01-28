@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, where, getDocs } from 'firebase/firestore'; // <--- Added query, where
+import { useUser } from '../contexts/UserContext'; // <--- 1. NEW IMPORT
 
 const AddonManager = () => {
     const navigate = useNavigate();
+    const { restaurantId } = useUser(); // <--- 2. GET RESTAURANT ID
 
     // --- STATE ---
     const [addons, setAddons] = useState([]);
@@ -31,12 +33,19 @@ const AddonManager = () => {
         const handleResize = () => setIsMobile(window.innerWidth < 768);
         window.addEventListener('resize', handleResize);
 
-        const unsubAddons = onSnapshot(collection(db, "modifiers"), (snapshot) => {
+        // <--- 3. GUARD CLAUSE
+        if (!restaurantId) return;
+
+        // <--- 4. FILTER MODIFIERS BY RESTAURANT ID
+        const qModifiers = query(collection(db, "modifiers"), where("userId", "==", restaurantId));
+        const unsubAddons = onSnapshot(qModifiers, (snapshot) => {
             setAddons(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
             setLoading(false);
         });
 
-        const unsubInventory = onSnapshot(collection(db, "inventory"), (snapshot) => {
+        // <--- 5. FILTER INVENTORY BY RESTAURANT ID
+        const qInventory = query(collection(db, "inventory"), where("userId", "==", restaurantId));
+        const unsubInventory = onSnapshot(qInventory, (snapshot) => {
             setStockItems(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         });
 
@@ -45,7 +54,7 @@ const AddonManager = () => {
             unsubInventory();
             window.removeEventListener('resize', handleResize);
         };
-    }, []);
+    }, [restaurantId]); // <--- 6. ADD DEPENDENCY
 
     // --- 2. RECIPE LOGIC ---
     const addIngredientToRecipe = () => {
@@ -88,7 +97,12 @@ const AddonManager = () => {
                 await updateDoc(doc(db, "modifiers", editingId), payload);
                 alert("Updated!");
             } else {
-                await addDoc(collection(db, "modifiers"), { ...payload, createdAt: serverTimestamp() });
+                // <--- 7. TAG NEW ADDON WITH RESTAURANT ID
+                await addDoc(collection(db, "modifiers"), { 
+                    ...payload, 
+                    userId: restaurantId, // <--- IMPORTANT
+                    createdAt: serverTimestamp() 
+                });
                 alert("Created!");
             }
             handleCancelEdit();

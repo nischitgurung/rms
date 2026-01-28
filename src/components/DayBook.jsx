@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
+import { useUser } from '../contexts/UserContext'; // <--- 1. NEW IMPORT
 
 const DayBook = () => {
   const navigate = useNavigate();
+  const { restaurantId } = useUser(); // <--- 2. GET RESTAURANT ID
   
   // --- STATE ---
   const [transactions, setTransactions] = useState([]);
@@ -33,14 +35,20 @@ const DayBook = () => {
 
   // --- FETCH DATA ---
   useEffect(() => {
+    // <--- 3. GUARD CLAUSE
+    if (!restaurantId) return;
+
     setLoading(true);
     const startOfDay = new Date(selectedDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(selectedDate);
     endOfDay.setHours(23, 59, 59, 999);
 
+    // <--- 4. UPDATED QUERY: Filter by Restaurant ID + Date Range + Sort
+    // NOTE: This might require a new Index. Check console for link.
     const q = query(
         collection(db, "transactions"),
+        where("userId", "==", restaurantId), // Filter by Restaurant
         where("date", ">=", startOfDay),
         where("date", "<=", endOfDay),
         orderBy("date", "desc")
@@ -64,7 +72,7 @@ const DayBook = () => {
     });
 
     return () => unsubscribe();
-  }, [selectedDate]);
+  }, [selectedDate, restaurantId]); // <--- 5. ADD DEPENDENCY
 
   const calculateStats = (data) => {
       let total = 0, cash = 0, online = 0, card = 0;

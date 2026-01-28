@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, where } from 'firebase/firestore';
+import { useUser } from '../contexts/UserContext';
+import { checkAndGenerateLowStockPO } from '../utils/InventoryLogic'; // <--- IMPORT AUTOMATION LOGIC
 
 // HELPER: Turns "Chicken Momo" into "chicken-momo" automatically
 const generateSlug = (text) => {
@@ -15,6 +17,7 @@ const generateSlug = (text) => {
 const Inventory = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { restaurantId } = useUser();
 
   // --- STATE ---
   const [activeTab, setActiveTab] = useState('STOCK');
@@ -51,12 +54,18 @@ const Inventory = () => {
     if (location.pathname.includes('suppliers')) setActiveTab('SUPPLIERS');
     else setActiveTab('STOCK');
 
-    const unsubInventory = onSnapshot(collection(db, "inventory"), (snap) => {
+    if (!restaurantId) return;
+
+    // Filter Inventory
+    const qInventory = query(collection(db, "inventory"), where("userId", "==", restaurantId));
+    const unsubInventory = onSnapshot(qInventory, (snap) => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setInventory(data.sort((a,b) => (a.itemName || "").localeCompare(b.itemName || "")));
     });
 
-    const unsubSuppliers = onSnapshot(collection(db, "suppliers"), (snap) => {
+    // Filter Suppliers
+    const qSuppliers = query(collection(db, "suppliers"), where("userId", "==", restaurantId));
+    const unsubSuppliers = onSnapshot(qSuppliers, (snap) => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setSuppliers(data);
       setLoading(false);
@@ -67,7 +76,7 @@ const Inventory = () => {
         unsubSuppliers(); 
         window.removeEventListener('resize', handleResize);
     };
-  }, [location]);
+  }, [location, restaurantId]);
 
   // --- HANDLERS ---
   const handleSaveStock = async (e) => {
@@ -87,11 +96,29 @@ const Inventory = () => {
     };
 
     try {
+        let currentItemId = editingId;
+
         if (editingId) {
+            // Update existing
             await updateDoc(doc(db, "inventory", editingId), payload);
         } else {
-            await addDoc(collection(db, "inventory"), { ...payload, createdAt: serverTimestamp() });
+            // Create new
+            const docRef = await addDoc(collection(db, "inventory"), { 
+                ...payload, 
+                userId: restaurantId, 
+                createdAt: serverTimestamp() 
+            });
+            currentItemId = docRef.id;
         }
+
+        // --- TRIGGER AUTOMATION ---
+        // We pass the full item object + ID + userId to the logic function
+        await checkAndGenerateLowStockPO(
+            { ...payload, id: currentItemId, userId: restaurantId }, // Item Data
+            payload.quantity, // Current Quantity
+            restaurantId // Owner ID
+        );
+
         closeModal();
     } catch (error) { 
         alert("Error saving stock: " + error.message); 
@@ -107,8 +134,14 @@ const Inventory = () => {
         email: supplierForm.email || '' 
       };
       try {
-          if (editingId) await updateDoc(doc(db, "suppliers", editingId), payload);
-          else await addDoc(collection(db, "suppliers"), payload);
+          if (editingId) {
+              await updateDoc(doc(db, "suppliers", editingId), payload);
+          } else {
+              await addDoc(collection(db, "suppliers"), {
+                  ...payload,
+                  userId: restaurantId
+              });
+          }
           closeModal();
       } catch (error) { alert("Error saving supplier"); }
   };

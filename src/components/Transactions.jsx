@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, Timestamp } from 'firebase/firestore';
+import { useUser } from '../contexts/UserContext'; // <--- 1. NEW IMPORT
 
 const Transactions = () => {
   const navigate = useNavigate();
+  const { restaurantId } = useUser(); // <--- 2. GET RESTAURANT ID
 
   // --- STATE ---
   const [allTransactions, setAllTransactions] = useState([]);
@@ -28,6 +30,9 @@ const Transactions = () => {
   }, []);
 
   const fetchTransactions = async () => {
+    // <--- 3. GUARD CLAUSE
+    if (!restaurantId) return;
+
     setLoading(true);
     try {
       const start = new Date(startDate);
@@ -35,8 +40,11 @@ const Transactions = () => {
       const end = new Date(endDate);
       end.setHours(23, 59, 59, 999);
 
+      // <--- 4. UPDATED QUERY: Filter by Restaurant ID + Date Range
+      // NOTE: This might require a new Index. Check console for link.
       const q = query(
         collection(db, "transactions"),
+        where("userId", "==", restaurantId), // Filter by Restaurant
         where("date", ">=", start),
         where("date", "<=", end)
       );
@@ -62,7 +70,7 @@ const Transactions = () => {
 
   useEffect(() => {
     fetchTransactions();
-  }, [startDate, endDate]);
+  }, [startDate, endDate, restaurantId]); // <--- 5. ADD DEPENDENCY
 
   useEffect(() => {
     let result = allTransactions;

@@ -2,8 +2,20 @@ import KhaltiCheckout from "khalti-checkout-web";
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, updateDoc, query, where, serverTimestamp, writeBatch, addDoc, deleteDoc } from 'firebase/firestore';
-import { Helmet, HelmetProvider } from 'react-helmet-async'; 
+import { 
+  collection, 
+  onSnapshot, 
+  doc, 
+  updateDoc, 
+  query, 
+  where, 
+  serverTimestamp, 
+  writeBatch, 
+  addDoc, 
+  deleteDoc 
+} from 'firebase/firestore';
+import { Helmet, HelmetProvider } from 'react-helmet-async';
+import { useUser } from '../contexts/UserContext'; 
 
 // --- HELPER: PARSE TIME STRING TO DATE OBJECT ---
 const parseTime = (timeStr) => {
@@ -20,7 +32,8 @@ const parseTime = (timeStr) => {
 
 const TableManagement = () => {
   const navigate = useNavigate();
-  
+  const { restaurantId, user } = useUser(); 
+
   // --- STATE ---
   const [tables, setTables] = useState([]);
   const [activeOrders, setActiveOrders] = useState([]); 
@@ -57,7 +70,7 @@ const TableManagement = () => {
         },
         onError(error) {
             console.log(error);
-            alert("Payment Failed.");
+            alert("Payment Failed: " + (error.message || "Unknown error"));
         },
         onClose() {
             console.log('Widget is closing');
@@ -68,11 +81,16 @@ const TableManagement = () => {
 
   // --- 1. FETCH TABLES & RESPONSIVENESS ---
   useEffect(() => {
-    // Mobile Listener
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
 
-    const unsubTables = onSnapshot(collection(db, "tables"), (snapshot) => {
+    // GUARD CLAUSE
+    if (!restaurantId) return;
+
+    // UPDATED QUERY: Filter by restaurantId
+    const qTables = query(collection(db, "tables"), where("userId", "==", restaurantId));
+    
+    const unsubTables = onSnapshot(qTables, (snapshot) => {
       const tableData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
       const sortedTables = tableData.sort((a, b) => {
@@ -84,7 +102,13 @@ const TableManagement = () => {
       setTables(sortedTables);
     });
 
-    const qOrders = query(collection(db, "orders"), where("status", "!=", "PAID"));
+    // UPDATED QUERY: Filter Orders by restaurantId
+    const qOrders = query(
+        collection(db, "orders"), 
+        where("userId", "==", restaurantId), // Filter by Restaurant
+        where("status", "!=", "PAID")
+    );
+    
     const unsubOrders = onSnapshot(qOrders, (snapshot) => {
         const ordersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         setActiveOrders(ordersData);
@@ -96,7 +120,7 @@ const TableManagement = () => {
         unsubOrders();
         window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [restaurantId]); 
 
   // --- 2. AUTO-RELEASE EXPIRED RESERVATIONS ---
   useEffect(() => {
@@ -107,7 +131,6 @@ const TableManagement = () => {
               if (table.status === 'Reserved' && table.arrivalTime) {
                   const arrivalDate = parseTime(table.arrivalTime);
                   if (arrivalDate && now > arrivalDate) {
-                      console.log(`Auto-releasing table ${table.name} due to expiration.`);
                       try {
                           await updateDoc(doc(db, "tables", table.id), {
                               status: "Available",
@@ -162,11 +185,12 @@ const TableManagement = () => {
               name: newTableName, 
               status: "Available", 
               guests: 0,
+              userId: restaurantId, // SAVE WITH RESTAURANT ID
               createdAt: serverTimestamp() 
           });
           setNewTableName('');
           setIsAddingTable(false);
-      } catch (e) { console.error(e); alert("Failed to add table"); }
+      } catch (e) { alert("Failed to add table: " + e.message); }
   };
 
   const handleRenameTable = async () => {
@@ -175,7 +199,7 @@ const TableManagement = () => {
           try {
               await updateDoc(doc(db, "tables", selectedTable.id), { name: newName });
               setSelectedTable(null); 
-          } catch (e) { console.error(e); alert("Failed to rename"); }
+          } catch (e) { alert("Failed to rename"); }
       }
   };
 
@@ -184,7 +208,7 @@ const TableManagement = () => {
           try {
               await deleteDoc(doc(db, "tables", selectedTable.id));
               setSelectedTable(null);
-          } catch (e) { console.error(e); alert("Failed to delete"); }
+          } catch (e) { alert("Failed to delete"); }
       }
   };
 
@@ -200,7 +224,8 @@ const TableManagement = () => {
     specificOrders.sort((a, b) => b.createdAt - a.createdAt);
     setCurrentTableOrders(specificOrders);
     
-    const total = specificOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
+    // Calculate Total Safely
+    const total = specificOrders.reduce((sum, order) => sum + (parseFloat(order.totalAmount) || 0), 0);
     setGrandTotal(total);
   };
 
@@ -231,13 +256,14 @@ const TableManagement = () => {
     try { await updateDoc(doc(db, "tables", selectedTable.id), { status: "Available", guests: 0, reservedBy: null, arrivalTime: null }); setSelectedTable(null); } catch (e) { console.error(e); }
   };
 
-  // --- PAYMENT ---
+  // --- PAYMENT LOGIC (FIXED) ---
   const handleProcessPayment = async (method = paymentMethod, khaltiPayload = null) => {
+    if (!restaurantId) return alert("System Error: No Restaurant ID found. Please re-login.");
     if (currentTableOrders.length === 0) return;
     
     const unservedOrders = currentTableOrders.filter(o => o.status !== 'COMPLETED');
     if (unservedOrders.length > 0) {
-        return alert(`Cannot generate bill! ${unservedOrders.length} order(s) are still in the Kitchen (Not Served).`);
+      return alert(`Cannot generate bill! ${unservedOrders.length} order(s) are still in the Kitchen (Not Served).`);
     }
 
     if (method !== 'Online' && !window.confirm(`Confirm payment of Rs. ${grandTotal.toFixed(2)}?`)) return;
@@ -246,14 +272,20 @@ const TableManagement = () => {
       const batch = writeBatch(db);
       
       const transactionRef = doc(collection(db, "transactions"));
+      
+      // FIX: Ensure staffEmail is never undefined
+      const safeStaffEmail = (user && user.email) ? user.email : 'Unknown';
+
       batch.set(transactionRef, {
         date: serverTimestamp(),
         type: "INCOME",
-        amount: grandTotal,
+        amount: parseFloat(grandTotal.toFixed(2)), // Ensure Number
         paymentMethod: method,
         orderIds: currentTableOrders.map(o => o.id),
         table: selectedTable.name,
-        khaltiToken: khaltiPayload ? khaltiPayload.token : null
+        userId: restaurantId, // SAVE WITH RESTAURANT ID
+        khaltiToken: khaltiPayload ? khaltiPayload.token : null,
+        staffEmail: safeStaffEmail // <--- Fixed: No longer undefined
       });
 
       currentTableOrders.forEach(order => {
@@ -273,7 +305,7 @@ const TableManagement = () => {
       
     } catch (error) {
       console.error("Billing Error:", error);
-      alert("Payment failed.");
+      alert(`Payment Failed: ${error.message}`);
     }
   };
 
@@ -507,70 +539,70 @@ const TableManagement = () => {
                           <div>
                                {showKhaltiQR ? (
                                    <div style={{ textAlign: 'center' }}>
-                                       <h3 style={{color:'#5C2D91'}}>Scan to Pay</h3>
-                                       <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg" alt="Khalti QR" style={{ width: '200px', height: '200px', margin: '0 auto' }} />
-                                       <div style={{display:'flex', gap:'10px', marginTop:'20px'}}>
-                                           <button onClick={() => setShowKhaltiQR(false)} style={{flex:1, padding:'10px', background:'white', border:'1px solid #ccc', borderRadius:'6px'}}>Cancel</button>
-                                           <button onClick={() => handleProcessPayment('Online', { token: 'QR-SCAN-VERIFIED' })} style={{flex:1, padding:'10px', background:'#5C2D91', color:'white', border:'none', borderRadius:'6px'}}>Confirm</button>
-                                       </div>
+                                        <h3 style={{color:'#5C2D91'}}>Scan to Pay</h3>
+                                        <img src="https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg" alt="Khalti QR" style={{ width: '200px', height: '200px', margin: '0 auto' }} />
+                                        <div style={{display:'flex', gap:'10px', marginTop:'20px'}}>
+                                            <button onClick={() => setShowKhaltiQR(false)} style={{flex:1, padding:'10px', background:'white', border:'1px solid #ccc', borderRadius:'6px'}}>Cancel</button>
+                                            <button onClick={() => handleProcessPayment('Online', { token: 'QR-SCAN-VERIFIED' })} style={{flex:1, padding:'10px', background:'#5C2D91', color:'white', border:'none', borderRadius:'6px'}}>Confirm</button>
+                                        </div>
                                    </div>
                                ) : (
                                    <>
-                                       {currentTableOrders.length > 0 ? (
-                                           <>
-                                               <div style={{ maxHeight: '200px', overflowY: 'auto', backgroundColor: '#f9f9f9', padding: '10px', borderRadius: '8px' }}>
-                                                   {currentTableOrders.map((order, idx) => (
-                                                       <div key={order.id} style={{ marginBottom: '10px', borderBottom: '1px dashed #ddd', paddingBottom: '5px' }}>
-                                                           <div style={{fontSize:'0.8rem', color:'#888', display:'flex', justifyContent:'space-between'}}>
-                                                               <span>Ticket #{idx + 1}</span>
-                                                               <span style={{ fontWeight:'bold', color: getKitchenBadge(order.status)?.text }}>
-                                                                   {order.status === 'COMPLETED' ? 'SERVED' : 'IN KITCHEN'}
-                                                               </span>
-                                                           </div>
-                                                           
-                                                           {order.items.map((item, i) => (
-                                                               <div key={i} style={{marginBottom:'5px'}}>
-                                                                   <div style={{display:'flex', justifyContent:'space-between', fontSize: '0.9rem'}}>
-                                                                       <span>{item.qty}x {item.name}</span>
-                                                                       <span>Rs. {(item.price * item.qty).toFixed(2)}</span>
-                                                                   </div>
-                                                                   {item.isCombo && item.comboItems && (
-                                                                       <div style={{ fontSize: '0.75rem', color: '#666', paddingLeft: '12px', marginTop: '2px', borderLeft: '2px solid #ddd' }}>
-                                                                           {item.comboItems.map((sub, sIdx) => (
-                                                                               <div key={sIdx}>• {sub.qty}x {sub.name}</div>
-                                                                           ))}
-                                                                       </div>
-                                                                   )}
-                                                               </div>
-                                                           ))}
-                                                       </div>
-                                                   ))}
-                                                   <div style={{display:'flex', justifyContent:'space-between', fontSize: '1.2rem', fontWeight:'bold', marginTop:'10px'}}>
-                                                       <span>Grand Total</span>
-                                                       <span>Rs. {grandTotal.toFixed(2)}</span>
-                                                   </div>
-                                               </div>
+                                        {currentTableOrders.length > 0 ? (
+                                            <>
+                                                <div style={{ maxHeight: '200px', overflowY: 'auto', backgroundColor: '#f9f9f9', padding: '10px', borderRadius: '8px' }}>
+                                                    {currentTableOrders.map((order, idx) => (
+                                                        <div key={order.id} style={{ marginBottom: '10px', borderBottom: '1px dashed #ddd', paddingBottom: '5px' }}>
+                                                            <div style={{fontSize:'0.8rem', color:'#888', display:'flex', justifyContent:'space-between'}}>
+                                                                <span>Ticket #{idx + 1}</span>
+                                                                <span style={{ fontWeight:'bold', color: getKitchenBadge(order.status)?.text }}>
+                                                                    {order.status === 'COMPLETED' ? 'SERVED' : 'IN KITCHEN'}
+                                                                </span>
+                                                            </div>
+                                                            
+                                                            {order.items.map((item, i) => (
+                                                                <div key={i} style={{marginBottom:'5px'}}>
+                                                                    <div style={{display:'flex', justifyContent:'space-between', fontSize: '0.9rem'}}>
+                                                                        <span>{item.qty}x {item.name}</span>
+                                                                        <span>Rs. {(item.price * item.qty).toFixed(2)}</span>
+                                                                    </div>
+                                                                    {item.isCombo && item.comboItems && (
+                                                                        <div style={{ fontSize: '0.75rem', color: '#666', paddingLeft: '12px', marginTop: '2px', borderLeft: '2px solid #ddd' }}>
+                                                                            {item.comboItems.map((sub, sIdx) => (
+                                                                                <div key={sIdx}>• {sub.qty}x {sub.name}</div>
+                                                                            ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ))}
+                                                    <div style={{display:'flex', justifyContent:'space-between', fontSize: '1.2rem', fontWeight:'bold', marginTop:'10px'}}>
+                                                        <span>Grand Total</span>
+                                                        <span>Rs. {grandTotal.toFixed(2)}</span>
+                                                    </div>
+                                                </div>
 
-                                               {/* WARNING IF KITCHEN PENDING */}
-                                               {!canSettleBill && (
-                                                  <div style={{backgroundColor:'#FFF3E0', color:'#E65100', padding:'10px', borderRadius:'6px', margin:'15px 0', fontSize:'0.9rem', border:'1px solid #FFCC80', display:'flex', alignItems:'center'}}>
-                                                      <span style={{marginRight:'8px', fontSize:'1.2rem', fontWeight:'bold'}}>!</span>
-                                                      <div>
-                                                          <strong>Bill Blocked:</strong> {unservedCount} order(s) are still active in the Kitchen. Please mark them as "Served" in KDS first.
-                                                      </div>
-                                                  </div>
-                                               )}
+                                                {/* WARNING IF KITCHEN PENDING */}
+                                                {!canSettleBill && (
+                                                    <div style={{backgroundColor:'#FFF3E0', color:'#E65100', padding:'10px', borderRadius:'6px', margin:'15px 0', fontSize:'0.9rem', border:'1px solid #FFCC80', display:'flex', alignItems:'center'}}>
+                                                        <span style={{marginRight:'8px', fontSize:'1.2rem', fontWeight:'bold'}}>!</span>
+                                                        <div>
+                                                            <strong>Bill Blocked:</strong> {unservedCount} order(s) are still active in the Kitchen. Please mark them as "Served" in KDS first.
+                                                        </div>
+                                                    </div>
+                                                )}
 
-                                               <div style={{ margin: '15px 0', opacity: !canSettleBill ? 0.5 : 1 }}>
-                                                   <label>Payment Method:</label>
-                                                   <select disabled={!canSettleBill} value={paymentMethod} onChange={(e)=>setPaymentMethod(e.target.value)} style={{ width: '100%', padding: '12px', marginTop: '5px', fontSize:'1rem' }}>
-                                                       <option value="Cash">Cash</option>
-                                                       <option value="Card">Card</option>
-                                                       <option value="Online">Online / Khalti</option>
-                                                   </select>
-                                               </div>
+                                                <div style={{ margin: '15px 0', opacity: !canSettleBill ? 0.5 : 1 }}>
+                                                    <label>Payment Method:</label>
+                                                    <select disabled={!canSettleBill} value={paymentMethod} onChange={(e)=>setPaymentMethod(e.target.value)} style={{ width: '100%', padding: '12px', marginTop: '5px', fontSize:'1rem' }}>
+                                                        <option value="Cash">Cash</option>
+                                                        <option value="Card">Card</option>
+                                                        <option value="Online">Online / Khalti</option>
+                                                    </select>
+                                                </div>
 
-                                               <button 
+                                                <button 
                                                   disabled={!canSettleBill}
                                                   onClick={() => paymentMethod === 'Online' ? setShowKhaltiQR(true) : handleProcessPayment(paymentMethod)} 
                                                   style={{
@@ -578,18 +610,18 @@ const TableManagement = () => {
                                                       opacity: !canSettleBill ? 0.5 : 1,
                                                       cursor: !canSettleBill ? 'not-allowed' : 'pointer'
                                                   }}
-                                               >
-                                                   {paymentMethod === 'Online' ? 'Generate QR / Pay' : 'Pay & Mark Billed'}
-                                               </button>
-                                           </>
-                                       ) : (
-                                           <div style={{textAlign:'center', padding:'20px'}}>
-                                               <p>No active unpaid orders found.</p>
-                                               <button onClick={handleCleanTable} style={btnStyle('#D32F2F')}>Force Clear</button>
-                                           </div>
-                                       )}
-                                       
-                                       <button onClick={() => setViewMode('ACTIONS')} style={{ ...btnStyle('transparent'), color: '#666', marginTop: '10px' }}>Back</button>
+                                                >
+                                                    {paymentMethod === 'Online' ? 'Generate QR / Pay' : 'Pay & Mark Billed'}
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <div style={{textAlign:'center', padding:'20px'}}>
+                                                <p>No active unpaid orders found.</p>
+                                                <button onClick={handleCleanTable} style={btnStyle('#D32F2F')}>Force Clear</button>
+                                            </div>
+                                        )}
+                                        
+                                        <button onClick={() => setViewMode('ACTIONS')} style={{ ...btnStyle('transparent'), color: '#666', marginTop: '10px' }}>Back</button>
                                    </>
                                )}
                           </div>
@@ -604,6 +636,6 @@ const TableManagement = () => {
   );
 };
 
-const btnStyle = (bg) => ({ width: '100%', padding: '12px', borderRadius: '6px', border: 'none', backgroundColor: bg, color: bg === 'white' || bg === 'transparent' ? 'black' : 'white', fontSize: '1rem', cursor: 'pointer', fontWeight: 'bold' });
+const btnStyle = (bg, color='white') => ({ width: '100%', padding: '12px', borderRadius: '6px', border: bg==='transparent'?'none':'1px solid #ddd', backgroundColor: bg, color: color, fontWeight: 'bold', cursor: 'pointer', fontSize:'1rem' });
 
 export default TableManagement;

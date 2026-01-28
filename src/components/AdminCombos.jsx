@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, onSnapshot, query, where } from 'firebase/firestore'; // <--- Added query, where
+import { useUser } from '../contexts/UserContext'; // <--- 1. NEW IMPORT
 
 // HELPER: Auto-creates URL-friendly slugs
 const generateSlug = (text) => {
@@ -10,6 +11,7 @@ const generateSlug = (text) => {
 
 const AdminCombos = () => {
   const navigate = useNavigate();
+  const { restaurantId } = useUser(); // <--- 2. GET RESTAURANT ID
   
   // --- STATE ---
   const [combos, setCombos] = useState([]);
@@ -44,16 +46,23 @@ const AdminCombos = () => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
 
+    // <--- 3. GUARD CLAUSE
+    if (!restaurantId) return;
+
     const fetchData = async () => {
         try {
-            const unsubCombos = onSnapshot(collection(db, "combos"), (snapshot) => {
+            // 4. FILTER COMBOS BY RESTAURANT ID
+            const qCombos = query(collection(db, "combos"), where("userId", "==", restaurantId));
+            const unsubCombos = onSnapshot(qCombos, (snapshot) => {
                 const fetchedCombos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 setCombos(fetchedCombos);
                 calculateStats(fetchedCombos);
                 setLoading(false);
             });
 
-            const itemSnap = await getDocs(collection(db, "menu_items"));
+            // 5. FILTER MENU ITEMS BY RESTAURANT ID (Important for selection)
+            const qItems = query(collection(db, "menu_items"), where("userId", "==", restaurantId));
+            const itemSnap = await getDocs(qItems);
             const fetchedItems = itemSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setMenuItems(fetchedItems);
 
@@ -66,7 +75,7 @@ const AdminCombos = () => {
     fetchData();
 
     return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  }, [restaurantId]); // <--- 6. ADD DEPENDENCY
 
   const calculateStats = (data) => {
       const total = data.length;
@@ -141,9 +150,6 @@ const AdminCombos = () => {
   };
 
   // --- ITEM MANAGEMENT HANDLERS ---
-  // Note: When items change, we keep the price static but recalculate the discount %
-  // (Or you could choose to keep discount static and update price - currently keeping price static is safer)
-  
   const handleAddItem = (item) => {
       setFormData(prev => {
           const existing = prev.comboItems.find(i => i.id === item.id);
@@ -154,7 +160,6 @@ const AdminCombos = () => {
               newItems = [...prev.comboItems, { id: item.id, name: item.name, qty: 1 }];
           }
           
-          // Re-calc discount based on new total and existing price
           const newTotal = getCurrentBundleRealTotal(newItems);
           const currentPrice = parseFloat(prev.price) || 0;
           const newDiscount = newTotal > 0 ? Math.round(((newTotal - currentPrice) / newTotal) * 100) : 0;
@@ -194,14 +199,12 @@ const AdminCombos = () => {
 
   const handleEditClick = (combo) => {
       let formattedItems = combo.comboItems || [];
-      
-      // Calculate initial discount percent for the form
       const { percent } = getDiscountInfo(formattedItems, combo.price);
 
       setFormData({
           name: combo.name,
           price: combo.price,
-          discountPercent: percent, // Pre-fill percentage
+          discountPercent: percent, 
           description: combo.description || '',
           comboItems: formattedItems,
           isAvailable: combo.isAvailable,
@@ -246,10 +249,14 @@ const AdminCombos = () => {
             await updateDoc(doc(db, "combos", editingId), payload);
             alert("Combo Updated!");
         } else {
-            await addDoc(collection(db, "combos"), payload);
+            // <--- 7. TAG NEW COMBO WITH RESTAURANT ID
+            await addDoc(collection(db, "combos"), { 
+                ...payload, 
+                userId: restaurantId // <--- IMPORTANT
+            });
             alert("Combo Created!");
         }
-        // Reset form
+        
         setFormData({ name: '', price: '', discountPercent: '', description: '', comboItems: [], isAvailable: true, seoTitle: '', seoDescription: '', slug: '' });
         setEditingId(null);
         setShowForm(false);

@@ -1,208 +1,179 @@
-import { useState, useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { auth } from './firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { useUser } from './contexts/UserContext';
 
-// --- COMPONENTS ---
+// --- AUTH COMPONENTS ---
 import Login from './components/Login';
-import Dashboard from './components/Dashboard';
-import MenuBoard from './components/MenuBoard'; // POS
-import TableManagement from './components/TableManagement';
-import KitchenDisplay from './components/KitchenDisplay';
-import AdminMenu from './components/AdminMenu';
-import Inventory from './components/Inventory';
-import AddonManager from './components/AddonManager';
-import DayBook from './components/DayBook';
-import AdminCategory from './components/AdminCategory';
-import AdminCombos from './components/AdminCombos';
-import Transactions from './components/Transactions';
-import SalesPurchases from './components/SalesPurchases';
-import IncomeExpenses from './components/IncomeExpenses';
-import Consumption from './components/Consumption'; 
-import Suppliers from './components/Suppliers';
 import Signup from './components/Signup';
 import ForgotPassword from './components/ForgotPassword';
 
-function App() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+// --- MAIN COMPONENTS ---
+import Dashboard from './components/Dashboard';
+import StaffManagement from './components/StaffManagement'; 
+import PublicMenu from './components/PublicMenu'; 
 
-  useEffect(() => {
-    // This is the core Firebase listener that keeps the user logged in
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      setLoading(false);
-    });
-    return unsubscribe;
-  }, []);
+// --- OPERATIONS (FOH/BOH) ---
+import MenuBoard from './components/MenuBoard'; // POS
+import TableManagement from './components/TableManagement';
+import KitchenDisplay from './components/KitchenDisplay';
+
+// --- ADMIN & MENU ---
+import AdminMenu from './components/AdminMenu';
+import AdminCategory from './components/AdminCategory';
+import AddonManager from './components/AddonManager'; 
+import AdminCombos from './components/AdminCombos';
+
+// --- INVENTORY ---
+import Inventory from './components/Inventory';
+import Consumption from './components/Consumption';
+import Suppliers from './components/Suppliers';
+
+// --- FINANCE ---
+import DayBook from './components/DayBook';
+import Transactions from './components/Transactions';
+import SalesPurchases from './components/SalesPurchases';
+import IncomeExpenses from './components/IncomeExpenses';
+
+function App() {
+  const { user, role, loading } = useUser();
 
   if (loading) {
     return (
-      <div style={{ 
-        height: '100vh', 
-        display: 'flex', 
-        flexDirection: 'column',
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        backgroundColor: '#f8f9fa',
-        fontFamily: 'Arial, sans-serif' 
-      }}>
-        <div style={spinnerStyle}></div>
-        <p style={{ marginTop: '20px', color: '#666', fontWeight: '500' }}>Initializing System...</p>
+      <div style={{ height: '100vh', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#555' }}>Loading System...</div>
       </div>
     );
   }
 
-  // --- ROUTE GUARDS ---
-
-  // ProtectedRoute: Only allows access if the user is authenticated via Firebase
-  const ProtectedRoute = ({ children }) => {
-    return user ? children : <Navigate to="/login" />;
+  // --- SECURITY WRAPPER ---
+  const ProtectedRoute = ({ children, allowedRoles }) => {
+    if (!user) return <Navigate to="/login" />;
+    
+    // Strict Role Check
+    if (allowedRoles && !allowedRoles.includes(role)) {
+       return (
+         <div style={{ padding: 50, textAlign: 'center', color: '#D32F2F', fontFamily: 'sans-serif' }}>
+           <h1 style={{ fontSize: '3rem' }}>⛔</h1>
+           <h2>Access Denied</h2>
+           <p>You are logged in as a <strong>{role ? role.toUpperCase() : 'UNKNOWN'}</strong>.</p>
+           <p>You do not have permission to view this page.</p>
+           <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#FFF0F0', border: '1px solid #FFCDD2', borderRadius: '8px', display: 'inline-block', textAlign:'left' }}>
+             <strong>Security Policy Violation:</strong>
+             <ul style={{ margin: '10px 0 0 20px', fontSize: '0.9rem' }}>
+               <li>Servers cannot access Manager reports.</li>
+               <li>Kitchen staff cannot modify Inventory.</li>
+               <li>Only Managers/Owners can view Financials.</li>
+             </ul>
+           </div>
+           <br />
+           <button 
+             onClick={() => window.history.back()}
+             style={{ padding: '10px 20px', marginTop: '20px', cursor: 'pointer', fontWeight: 'bold' }}
+           >
+             Go Back
+           </button>
+         </div>
+       );
+    }
+    return children;
   };
 
-  // PublicRoute: Prevents logged-in users from accessing Login/Signup/ForgotPass
+  // --- PUBLIC WRAPPER ---
   const PublicRoute = ({ children }) => {
     return !user ? children : <Navigate to="/" />;
   };
 
   return (
     <Routes>
-      {/* --- PUBLIC AUTH ROUTES --- */}
-      <Route path="/login" element={
-        <PublicRoute>
-          <Login onLogin={() => {}} />
-        </PublicRoute>
-      } />
+      {/* ==========================
+          1. PUBLIC ROUTES (No Login)
+      ========================== */}
+      <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+      <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
+      <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
       
-      <Route path="/signup" element={
-        <PublicRoute>
-          <Signup />
-        </PublicRoute>
-      } />
-      
-      <Route path="/forgot-password" element={
-        <PublicRoute>
-          <ForgotPassword />
-        </PublicRoute>
-      } />
+      {/* CUSTOMER QR MENU (Visible to anyone with the link) */}
+      <Route path="/menu/:restaurantId" element={<PublicMenu />} />
 
-      {/* --- PRIVATE BUSINESS ROUTES (PROTECTED) --- */}
+
+      {/* ==========================
+          2. DASHBOARD (Everyone)
+      ========================== */}
       <Route path="/" element={
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={['owner', 'manager', 'waiter', 'kitchen']}>
           <Dashboard />
         </ProtectedRoute>
       } />
+
+
+      {/* ==========================
+          3. STAFF MGMT (Owner/Manager)
+      ========================== */}
+      <Route path="/staff" element={
+        <ProtectedRoute allowedRoles={['owner', 'manager']}>
+          <StaffManagement />
+        </ProtectedRoute>
+      } />
       
-      {/* POS & Table Management */}
+
+      {/* ==========================
+          4. FRONT OF HOUSE (Waiter+)
+      ========================== */}
       <Route path="/pos" element={
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={['owner', 'manager', 'waiter']}>
           <MenuBoard />
         </ProtectedRoute>
       } />
-
       <Route path="/tables" element={
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={['owner', 'manager', 'waiter']}>
           <TableManagement />
         </ProtectedRoute>
       } />
 
+
+      {/* ==========================
+          5. KITCHEN (Kitchen+)
+      ========================== */}
       <Route path="/orders" element={
-        <ProtectedRoute>
+        <ProtectedRoute allowedRoles={['owner', 'manager', 'kitchen']}>
           <KitchenDisplay />
         </ProtectedRoute>
       } />
 
-      {/* Admin & Menu Control */}
-      <Route path="/admin-menu" element={
-        <ProtectedRoute>
-          <AdminMenu />
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/admin-category" element={
-        <ProtectedRoute>
-          <AdminCategory />
-        </ProtectedRoute>
-      } />
 
-      <Route path="/admin-addons" element={
-        <ProtectedRoute>
-          <AddonManager />
-        </ProtectedRoute>
-      } />
+      {/* ==========================
+          6. MENU ADMIN (Manager+)
+      ========================== */}
+      <Route path="/admin-menu" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><AdminMenu /></ProtectedRoute>} />
+      <Route path="/admin-category" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><AdminCategory /></ProtectedRoute>} />
+      <Route path="/admin-addons" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><AddonManager /></ProtectedRoute>} />
+      <Route path="/admin-combos" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><AdminCombos /></ProtectedRoute>} />
 
-      <Route path="/admin-combos" element={
-        <ProtectedRoute>
-          <AdminCombos />
-        </ProtectedRoute>
-      } />
 
-      {/* Inventory Management */}
-      <Route path="/inventory-stock" element={
-        <ProtectedRoute>
-          <Inventory />
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/inventory-consumption" element={
-        <ProtectedRoute>
-          <Consumption />
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/inventory-suppliers" element={
-        <ProtectedRoute>
-          <Suppliers />
-        </ProtectedRoute>
-      } />
+      {/* ==========================
+          7. INVENTORY (Manager+)
+      ========================== */}
+      {/* UPDATED: Managers need access to set Par Levels and Vendors per User Story 2.1 */}
+      <Route path="/inventory-stock" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><Inventory /></ProtectedRoute>} />
+      <Route path="/inventory-consumption" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><Consumption /></ProtectedRoute>} />
+      <Route path="/inventory-suppliers" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><Suppliers /></ProtectedRoute>} />
 
-      {/* Finance & Reports */}
-      <Route path="/finance-daybook" element={
-        <ProtectedRoute>
-          <DayBook />
-        </ProtectedRoute>
-      } />
 
-      <Route path="/finance-transactions" element={
-        <ProtectedRoute>
-          <Transactions />
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/finance-sales" element={
-        <ProtectedRoute>
-          <SalesPurchases />
-        </ProtectedRoute>
-      } />
-      
-      <Route path="/finance-income" element={
-        <ProtectedRoute>
-          <IncomeExpenses />
-        </ProtectedRoute>
-      } />
+      {/* ==========================
+          8. FINANCE (Owner & Manager)
+      ========================== */}
+      {/* UPDATED: Managers added because they need to generate COGS Reports per User Story 4.1 */}
+      <Route path="/finance-daybook" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><DayBook /></ProtectedRoute>} />
+      <Route path="/finance-transactions" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><Transactions /></ProtectedRoute>} />
+      <Route path="/finance-sales" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><SalesPurchases /></ProtectedRoute>} />
+      <Route path="/finance-income" element={<ProtectedRoute allowedRoles={['owner', 'manager']}><IncomeExpenses /></ProtectedRoute>} />
 
-      {/* --- GLOBAL REDIRECT --- */}
+
+      {/* ==========================
+          9. CATCH ALL
+      ========================== */}
       <Route path="*" element={<Navigate to={user ? "/" : "/login"} />} />
     </Routes>
   );
 }
-
-// Simple CSS spinner for the loading screen
-const spinnerStyle = {
-  width: '40px',
-  height: '40px',
-  border: '4px solid #f3f3f3',
-  borderTop: '4px solid #000',
-  borderRadius: '50%',
-  animation: 'spin 1s linear infinite',
-};
-
-// Add this to your index.css or a global style tag
-/*
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-*/
 
 export default App;

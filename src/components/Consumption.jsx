@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, onSnapshot, doc, updateDoc, query, where } from 'firebase/firestore';
+import { useUser } from '../contexts/UserContext'; // <--- 1. NEW IMPORT
 
 const Consumption = () => {
   const navigate = useNavigate();
+  const { restaurantId } = useUser(); // <--- 2. GET RESTAURANT ID
 
   // --- STATE ---
   const [menuItems, setMenuItems] = useState([]);
@@ -25,17 +27,31 @@ const Consumption = () => {
     const handleResize = () => setIsMobile(window.innerWidth < 1024);
     window.addEventListener('resize', handleResize);
 
-    const unsubMenu = onSnapshot(collection(db, "menu_items"), (snap) => {
+    // <--- 3. GUARD CLAUSE
+    if (!restaurantId) return;
+
+    // 4. FILTER MENU BY RESTAURANT ID
+    const qMenu = query(collection(db, "menu_items"), where("userId", "==", restaurantId));
+    const unsubMenu = onSnapshot(qMenu, (snap) => {
       setMenuItems(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (a.name || "").localeCompare(b.name || "")));
     });
 
-    const unsubStock = onSnapshot(collection(db, "inventory"), (snap) => {
+    // 5. FILTER INVENTORY BY RESTAURANT ID
+    const qStock = query(collection(db, "inventory"), where("userId", "==", restaurantId));
+    const unsubStock = onSnapshot(qStock, (snap) => {
       setStockItems(snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a,b) => (a.itemName || "").localeCompare(b.itemName || "")));
     });
 
+    // 6. FILTER ORDERS BY RESTAURANT ID + DATE
+    // NOTE: This might require a new Index. Check console for link.
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
-    const qOrders = query(collection(db, "orders"), where("createdAt", ">=", startOfDay));
+    
+    const qOrders = query(
+        collection(db, "orders"), 
+        where("userId", "==", restaurantId), // Filter by Restaurant
+        where("createdAt", ">=", startOfDay)
+    );
     
     const unsubOrders = onSnapshot(qOrders, (snap) => {
         const rawOrders = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -47,7 +63,7 @@ const Consumption = () => {
       unsubMenu(); unsubStock(); unsubOrders(); 
       window.removeEventListener('resize', handleResize);
     };
-  }, []);
+  }, [restaurantId]); // <--- 7. ADD DEPENDENCY
 
   const getSelectedStockUnit = () => {
       const item = stockItems.find(s => s.id === ingredientForm.stockId);
