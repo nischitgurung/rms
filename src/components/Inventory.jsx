@@ -222,7 +222,7 @@ const Inventory = () => {
           <input type="text" placeholder={`Search by name or alias...`} value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{...styles.searchInput, width: isMobile ? '100%' : '300px'}} />
           <button onClick={() => setIsModalOpen(true)} style={{...styles.addBtn, padding: isMobile ? '15px' : '10px 20px'}}>{activeTab === 'STOCK' ? '+ Add Item' : '+ Add Supplier'}</button>
       </div>
-
+        
       {/* DATA VIEW SWITCH: MOBILE CARDS vs DESKTOP TABLE */}
       {isMobile ? (
           /* MOBILE CARD LIST */
@@ -323,6 +323,23 @@ const Inventory = () => {
                               <div style={{flex:1}}><label style={styles.label}>Current Qty</label><input type="number" required value={stockForm.quantity} onChange={e => setStockForm({...stockForm, quantity: e.target.value})} style={styles.input} /></div>
                               <div style={{flex:1}}><label style={styles.label}>Unit</label><input type="text" value={stockForm.unit} onChange={e => setStockForm({...stockForm, unit: e.target.value})} style={styles.input} /></div>
                               <div style={{flex:1}}><label style={styles.label}>Min Alert</label><input type="number" value={stockForm.minStock} onChange={e => setStockForm({...stockForm, minStock: e.target.value})} style={styles.input} /></div>
+                          </div>
+
+                          {/* SUPPLIER SELECTION ADDED HERE */}
+                          <div>
+                            <label style={styles.label}>Supplier</label>
+                            <select 
+                                value={stockForm.supplierId} 
+                                onChange={e => setStockForm({...stockForm, supplierId: e.target.value})} 
+                                style={{...styles.input, backgroundColor: 'white'}}
+                            >
+                                <option value="">Select Supplier</option>
+                                {suppliers.map(sup => (
+                                    <option key={sup.id} value={sup.id}>
+                                        {sup.name}
+                                    </option>
+                                ))}
+                            </select>
                           </div>
 
                           {/* SEO CMS SECTION */}
