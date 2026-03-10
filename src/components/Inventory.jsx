@@ -124,27 +124,56 @@ const Inventory = () => {
     }
   };
 
-  const handleSaveSupplier = async (e) => {
-      e.preventDefault();
-      const payload = { 
-        name: supplierForm.name || '', 
-        contact: supplierForm.contact || '', 
-        address: supplierForm.address || '', 
-        email: supplierForm.email || '' 
-      };
-      try {
-          if (editingId) {
-              await updateDoc(doc(db, "suppliers", editingId), payload);
-          } else {
-              await addDoc(collection(db, "suppliers"), {
-                  ...payload,
-                  userId: restaurantId
-              });
-          }
-          closeModal();
-      } catch (error) { alert("Error saving supplier"); }
-  };
+ const handleSaveStock = async (e) => {
+    e.preventDefault();
+    const payload = { 
+        itemName: stockForm.itemName || '', 
+        category: stockForm.category || 'General', 
+        quantity: parseFloat(stockForm.quantity) || 0, 
+        unit: stockForm.unit || 'kg', 
+        minStock: parseFloat(stockForm.minStock) || 0, 
+        supplierId: stockForm.supplierId || '',
+        seoTitle: stockForm.seoTitle || stockForm.itemName,
+        seoDescription: stockForm.seoDescription || '',
+        slug: stockForm.slug || generateSlug(stockForm.itemName),
+        altText: stockForm.altText || stockForm.itemName,
+        updatedAt: serverTimestamp() 
+    };
 
+    try {
+        let currentItemId = editingId;
+
+        // 1. Core Logic: Save to Firestore First
+        if (editingId) {
+            await updateDoc(doc(db, "inventory", editingId), payload);
+        } else {
+            const docRef = await addDoc(collection(db, "inventory"), { 
+                ...payload, 
+                userId: restaurantId, 
+                createdAt: serverTimestamp() 
+            });
+            currentItemId = docRef.id;
+        }
+
+        // 2. Isolated Logic: Trigger Automation
+        // We wrap this in its own try-catch so it doesn't crash the UI if automation fails
+        try {
+            await checkAndGenerateLowStockPO(
+                { ...payload, id: currentItemId, userId: restaurantId },
+                payload.quantity,
+                restaurantId
+            );
+        } catch (autoError) {
+            console.error("Automation/Daybook update failed, but item was saved:", autoError);
+            // We don't alert the user here because the item WAS saved successfully
+        }
+
+        closeModal();
+    } catch (error) { 
+        console.error("Critical Save Error:", error);
+        alert("Error saving stock: " + error.message); 
+    }
+  };
   const handleDelete = async (id, type) => {
     const collectionName = type === 'STOCK' ? "inventory" : "suppliers";
     if (window.confirm(`Delete this ${type === 'STOCK' ? 'item' : 'supplier'}?`)) {
