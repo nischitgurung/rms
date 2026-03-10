@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { db } from '../firebase';
 import { collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, serverTimestamp, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { checkAndGenerateLowStockPO } from '../utils/InventoryLogic'; // <--- IMPORT AUTOMATION LOGIC
-
+import { useUser } from '../contexts/UserContext';
 // HELPER: Turns "Chicken Momo" into "chicken-momo" automatically
 const generateSlug = (text) => {
     return text
