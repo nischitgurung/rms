@@ -12,7 +12,7 @@ import {
   query,     
   where,
   increment 
-} from 'firebase/firestore';
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { Helmet, HelmetProvider } from 'react-helmet-async'; 
 import { useUser } from '../contexts/UserContext'; 
 import ManagerGuard from './ManagerGuard'; 
