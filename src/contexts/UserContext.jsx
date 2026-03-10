@@ -1,7 +1,8 @@
-import * as React from 'react'; // Import everything as a single object
+import * as React from 'react';
 
 // --- FIREBASE CDN IMPORTS ---
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+// Added getApps and getApp to handle the duplicate app error
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
@@ -15,14 +16,13 @@ const firebaseConfig = {
     appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-const app = initializeApp(firebaseConfig);
+// --- FIX: CHECK IF APP EXISTS BEFORE INITIALIZING ---
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 const auth = getAuth(app);
 
-// Use React.createContext to guarantee it is defined
 const UserContext = React.createContext();
 
 export const UserProvider = ({ children }) => {
-  // Using React. prefix for all hooks
   const [user, setUser] = React.useState(null); 
   const [role, setRole] = React.useState(null); 
   const [restaurantId, setRestaurantId] = React.useState(null); 
@@ -48,7 +48,9 @@ export const UserProvider = ({ children }) => {
 
   const resetTimer = () => {
     if (!user) return;
-    if (logoutTimer.current) React.clearTimeout(logoutTimer.current);
+    if (logoutTimer.current) {
+        clearTimeout(logoutTimer.current);
+    }
     logoutTimer.current = setTimeout(logout, ACTIVITY_TIMEOUT);
   };
 
@@ -72,15 +74,19 @@ export const UserProvider = ({ children }) => {
   React.useEffect(() => {
     const storedStaff = localStorage.getItem('staff_user');
     if (storedStaff) {
-        const staffData = JSON.parse(storedStaff);
-        setUser(staffData);
-        setRole(staffData.role.toLowerCase()); 
-        setRestaurantId(staffData.restaurantId);
-        setLoading(false);
-        return; 
+        try {
+            const staffData = JSON.parse(storedStaff);
+            setUser(staffData);
+            setRole(staffData.role.toLowerCase()); 
+            setRestaurantId(staffData.restaurantId);
+            setLoading(false);
+            return; 
+        } catch (e) {
+            localStorage.removeItem('staff_user');
+        }
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
         if (currentUser) {
             setUser(currentUser);
             setRole('owner');
