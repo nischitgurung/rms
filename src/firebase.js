@@ -1,19 +1,18 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCZX4YhYf-d4jW358raJMqP29f0-GsxVHo",
-  authDomain: "rms-mvp-2.firebaseapp.com",
-  projectId: "rms-mvp-2",
-  storageBucket: "rms-mvp-2.firebasestorage.app",
-  messagingSenderId: "931221656364",
-  appId: "1:931221656364:web:8c5756184852e008453472"
+    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Initialize App
-const app = initializeApp(firebaseConfig);
-
-// Initialize Services (Storage REMOVED to stop the crash)
-export const db = getFirestore(app);
+// Singleton pattern: only initialize if not already started
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export const db = getFirestore(app);
+export default app;

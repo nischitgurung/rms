@@ -1,24 +1,10 @@
 import * as React from 'react';
 
-// --- FIREBASE CDN IMPORTS ---
-// Added getApps and getApp to handle the duplicate app error
-import { initializeApp, getApps, getApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+// --- FIREBASE AUTH IMPORTS ---
+import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-// --- FIREBASE CONFIGURATION ---
-const firebaseConfig = {
-    apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env.VITE_FIREBASE_APP_ID
-};
-
-// --- FIX: CHECK IF APP EXISTS BEFORE INITIALIZING ---
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const auth = getAuth(app);
+// IMPORT the shared auth instance from your firebase.js
+import { auth } from '../firebase'; 
 
 const UserContext = React.createContext();
 
@@ -38,7 +24,7 @@ export const UserProvider = ({ children }) => {
           } else {
               await signOut(auth);
           }
-      } catch (err) { console.error(err); }
+      } catch (err) { console.error("Logout Error:", err); }
       
       setUser(null);
       setRole(null);
