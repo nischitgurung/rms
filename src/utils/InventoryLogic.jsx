@@ -10,7 +10,8 @@ import {
   getDoc
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-import emailjs from '@emailjs/browser';
+// FIX: Using CDN import for EmailJS to match Firebase and avoid deployment path issues
+import emailjs from 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/index.esm.js';
 
 // 🔑 EMAIL JS CONFIG
 const SERVICE_ID = 'service_lt5byrp';
@@ -45,20 +46,26 @@ export const checkAndGenerateLowStockPO = async (item, newQuantity, restaurantId
 
         // 4. Send LOW STOCK EMAIL
         if (supplier.email) {
-            await emailjs.send(
-                SERVICE_ID,
-                TEMPLATE_ID,
-                {
-                    supplier_name: supplier.name,
-                    item_name: item.itemName,
-                    current_qty: newQuantity,
-                    min_stock: minStock,
-                    unit: item.unit
-                },
-                PUBLIC_KEY
-            );
-
-            console.log('📧 Low stock email sent');
+            try {
+                await emailjs.send(
+                    SERVICE_ID,
+                    TEMPLATE_ID,
+                    {
+                        // FIX: Added to_email so EmailJS knows where to send it
+                        to_email: supplier.email, 
+                        supplier_name: supplier.name,
+                        item_name: item.itemName,
+                        current_qty: newQuantity,
+                        min_stock: minStock,
+                        unit: item.unit
+                    },
+                    PUBLIC_KEY
+                );
+                console.log('📧 Low stock email sent to:', supplier.email);
+            } catch (emailErr) {
+                // We log this but DON'T stop the function, so the PO still gets created
+                console.error("EmailJS Error (Check your dashboard template):", emailErr);
+            }
         }
 
         // 5. Prevent Duplicate Draft PO
@@ -87,12 +94,15 @@ export const checkAndGenerateLowStockPO = async (item, newQuantity, restaurantId
                 }]
             });
 
-            alert(`⚡ AUTOMATION: Draft PO created & email sent for ${item.itemName}`);
+            console.log(`⚡ AUTOMATION: Draft PO created for ${item.itemName}`);
+            // Use alert only if you want a popup during the sale
+            // alert(`Automation: Draft PO created for ${item.itemName}`);
         } else {
-            console.log("Draft PO already exists. Email already sent.");
+            console.log("Draft PO already exists.");
         }
 
     } catch (error) {
+        // This catch handles any Firestore errors
         console.error("Low stock automation failed:", error);
     }
 };
