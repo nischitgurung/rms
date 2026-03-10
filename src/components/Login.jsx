@@ -102,35 +102,56 @@ const Login = () => {
   // --- HANDLER: STAFF LOGIN ---
  const handleStaffLogin = async (e) => {
     e.preventDefault();
-    alert("Button Clicked! PIN is: " + staffPin); // <-- ADD THIS
-    console.log("Button Clicked! PIN is:", staffPin); 
-    
-    setLoading(true);
     setError('');
+    setLoading(true);
 
     try {
-        const q = query(collection(db, "staff"), where("pin", "==", staffPin));
-        const snap = await getDocs(q);
+      console.log("1. Starting Firebase Query for PIN:", staffPin);
 
-        if (snap.empty) throw new Error("Invalid PIN");
+      // We use collection(db, "staff") - Ensure 'db' is imported from your firebase.js
+      const staffRef = collection(db, "staff");
+      const q = query(staffRef, where("pin", "==", staffPin));
+      
+      const snap = await getDocs(q);
 
-        const staffMember = snap.docs[0].data();
-        const staffId = snap.docs[0].id;
+      if (snap.empty) {
+        console.log("2. Result: No staff found with that PIN");
+        setError("Invalid PIN. Access Denied.");
+        setLoading(false);
+        return;
+      }
 
-        staffLogin({
-            uid: staffId,
-            name: staffMember.name,
-            role: staffMember.role,
-            restaurantId: staffMember.userId 
-        });
-        navigate('/');
+      const staffDoc = snap.docs[0];
+      const staffMember = staffDoc.data();
+      console.log("3. Result: Staff Found!", staffMember.name);
+
+      // Check if the staffLogin function exists in your context
+      if (typeof staffLogin !== 'function') {
+        console.error("CRITICAL: staffLogin function is missing from UserContext!");
+        setError("System Error: Login function not found.");
+        setLoading(false);
+        return;
+      }
+
+      console.log("4. Attempting to update context with restaurantId:", staffMember.userId);
+      
+      await staffLogin({
+        uid: staffDoc.id,
+        name: staffMember.name,
+        role: staffMember.role,
+        restaurantId: staffMember.userId // This links them to the owner's data
+      });
+
+      console.log("5. Success! Redirecting...");
+      navigate('/');
 
     } catch (err) {
-        setError("Invalid PIN. Please try again.");
-        setLoading(false);
+      console.error("🔥 Firebase/Logic Error:", err);
+      setError("Login failed: " + err.message);
+    } finally {
+      setLoading(false);
     }
   };
-
   return (
     <div style={styles.container}>
       <div id="recaptcha-container"></div>
