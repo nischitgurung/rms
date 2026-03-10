@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { auth, db } from '../firebase'; 
 import { 
   signInWithEmailAndPassword, 
@@ -100,58 +101,35 @@ const Login = () => {
   };
 
   // --- HANDLER: STAFF LOGIN ---
- const handleStaffLogin = async (e) => {
+const handleStaffLogin = async (e) => {
     e.preventDefault();
-    setError('');
     setLoading(true);
-
     try {
-      console.log("1. Starting Firebase Query for PIN:", staffPin);
+        const q = query(collection(db, "staff"), where("pin", "==", staffPin));
+        const snap = await getDocs(q);
 
-      // We use collection(db, "staff") - Ensure 'db' is imported from your firebase.js
-      const staffRef = collection(db, "staff");
-      const q = query(staffRef, where("pin", "==", staffPin));
-      
-      const snap = await getDocs(q);
+        if (snap.empty) throw new Error("Invalid PIN");
 
-      if (snap.empty) {
-        console.log("2. Result: No staff found with that PIN");
-        setError("Invalid PIN. Access Denied.");
-        setLoading(false);
-        return;
-      }
+        const staffMember = snap.docs[0].data();
+        
+        // --- THE STRONG FIX: Sign in Anonymously ---
+        // This gives the staff a real session in Firebase's eyes
+        await signInAnonymously(auth); 
 
-      const staffDoc = snap.docs[0];
-      const staffMember = staffDoc.data();
-      console.log("3. Result: Staff Found!", staffMember.name);
-
-      // Check if the staffLogin function exists in your context
-      if (typeof staffLogin !== 'function') {
-        console.error("CRITICAL: staffLogin function is missing from UserContext!");
-        setError("System Error: Login function not found.");
-        setLoading(false);
-        return;
-      }
-
-      console.log("4. Attempting to update context with restaurantId:", staffMember.userId);
-      
-      await staffLogin({
-        uid: staffDoc.id,
-        name: staffMember.name,
-        role: staffMember.role,
-        restaurantId: staffMember.userId // This links them to the owner's data
-      });
-
-      console.log("5. Success! Redirecting...");
-      navigate('/');
-
+        staffLogin({
+            uid: snap.docs[0].id,
+            name: staffMember.name,
+            role: staffMember.role,
+            restaurantId: staffMember.userId 
+        });
+        
+        navigate('/');
     } catch (err) {
-      console.error("🔥 Firebase/Logic Error:", err);
-      setError("Login failed: " + err.message);
+        setError("Access Denied: " + err.message);
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
-  };
+};
   return (
     <div style={styles.container}>
       <div id="recaptcha-container"></div>
