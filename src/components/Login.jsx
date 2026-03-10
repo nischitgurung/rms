@@ -104,28 +104,30 @@ const Login = () => {
 const handleStaffLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-    try {
-        const q = query(collection(db, "staff"), where("pin", "==", staffPin));
-        const snap = await getDocs(q);
+   try {
+    const q = query(collection(db, "staff"), where("pin", "==", staffPin));
+    const snap = await getDocs(q);
 
-        if (snap.empty) throw new Error("Invalid PIN");
+    if (snap.empty) throw new Error("Invalid PIN");
 
-        const staffMember = snap.docs[0].data();
-        
-        // --- THE STRONG FIX: Sign in Anonymously ---
-        // This gives the staff a real session in Firebase's eyes
-        await signInAnonymously(auth); 
+    const staffMember = snap.docs[0].data();
+    
+    // This creates a "session" so Security Rules allow the POS to load data
+    const userCredential = await signInAnonymously(auth); 
+    console.log("Authenticated as:", userCredential.user.uid);
 
-        staffLogin({
-            uid: snap.docs[0].id,
-            name: staffMember.name,
-            role: staffMember.role,
-            restaurantId: staffMember.userId 
-        });
-        
-        navigate('/');
-    } catch (err) {
-        setError("Access Denied: " + err.message);
+    staffLogin({
+        uid: snap.docs[0].id, // Staff document ID
+        authUid: userCredential.user.uid, // Their temp Firebase Auth ID
+        name: staffMember.name,
+        role: staffMember.role,
+        restaurantId: staffMember.userId 
+    });
+    
+    navigate('/');
+} catch (err) {
+    // If you see 'admin-restricted-operation' here, it's 100% the Console setting
+    setError("Access Denied: " + err.message);
     } finally {
         setLoading(false);
     }
