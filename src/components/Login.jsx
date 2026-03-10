@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { signInAnonymously } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 import { auth, db } from '../firebase'; 
 import { 
   signInWithEmailAndPassword, 
@@ -10,7 +9,7 @@ import {
   PhoneMultiFactorGenerator,
   RecaptchaVerifier 
 } from 'firebase/auth';
-import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { collection, query, where, getDocs } from 'firebase/firestore'; 
 import { Link, useNavigate } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext'; 
 
@@ -101,37 +100,34 @@ const Login = () => {
   };
 
   // --- HANDLER: STAFF LOGIN ---
-const handleStaffLogin = async (e) => {
+  const handleStaffLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
-   try {
-    const q = query(collection(db, "staff"), where("pin", "==", staffPin));
-    const snap = await getDocs(q);
+    setError('');
 
-    if (snap.empty) throw new Error("Invalid PIN");
+    try {
+        const q = query(collection(db, "staff"), where("pin", "==", staffPin));
+        const snap = await getDocs(q);
 
-    const staffMember = snap.docs[0].data();
-    
-    // This creates a "session" so Security Rules allow the POS to load data
-    const userCredential = await signInAnonymously(auth); 
-    console.log("Authenticated as:", userCredential.user.uid);
+        if (snap.empty) throw new Error("Invalid PIN");
 
-    staffLogin({
-        uid: snap.docs[0].id, // Staff document ID
-        authUid: userCredential.user.uid, // Their temp Firebase Auth ID
-        name: staffMember.name,
-        role: staffMember.role,
-        restaurantId: staffMember.userId 
-    });
-    
-    navigate('/');
-} catch (err) {
-    // If you see 'admin-restricted-operation' here, it's 100% the Console setting
-    setError("Access Denied: " + err.message);
-    } finally {
+        const staffMember = snap.docs[0].data();
+        const staffId = snap.docs[0].id;
+
+        staffLogin({
+            uid: staffId,
+            name: staffMember.name,
+            role: staffMember.role,
+            restaurantId: staffMember.userId 
+        });
+        navigate('/');
+
+    } catch (err) {
+        setError("Invalid PIN. Please try again.");
         setLoading(false);
     }
-};
+  };
+
   return (
     <div style={styles.container}>
       <div id="recaptcha-container"></div>
