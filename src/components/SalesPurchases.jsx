@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, where } from 'firebase/firestore'; // <--- Added 'where'
+import { collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"; // <--- Added 'where'
 import { useUser } from '../contexts/UserContext'; // <--- 1. NEW IMPORT
 
 const SalesPurchases = () => {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, onSnapshot, doc, updateDoc, query, where } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { useUser } from '../contexts/UserContext'; // <--- 1. NEW IMPORT
 
 const Consumption = () => {

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { db } from '../firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { useUser } from '../contexts/UserContext';
 
 const ManagerGuard = ({ onSuccess, onClose, actionName }) => {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebase';
-import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, onSnapshot, query, where } from 'firebase/firestore'; // <--- Added query, where
+import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, serverTimestamp, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"; // <--- Added query, where
 import { useUser } from '../contexts/UserContext'; // <--- 1. NEW IMPORT
 
 // HELPER: Auto-creates URL-friendly slugs

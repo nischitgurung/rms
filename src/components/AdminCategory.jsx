@@ -12,7 +12,7 @@ import {
   onSnapshot,
   query, // <--- Added
   where  // <--- Added
-} from 'firebase/firestore';
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import Cropper from 'react-easy-crop';
 import { useUser } from '../contexts/UserContext'; // <--- 1. NEW IMPORT
 
