@@ -1,12 +1,11 @@
-import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import * as React from 'react'; // Import everything as a single object
 
 // --- FIREBASE CDN IMPORTS ---
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 // --- FIREBASE CONFIGURATION ---
-// Ensure these match your actual Firebase project settings
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
     authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -16,36 +15,30 @@ const firebaseConfig = {
     appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Initialize Firebase once inside this file to ensure 'auth' is always defined
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
-const db = getFirestore(app);
 
-// 1. Create the Context
-const UserContext = createContext();
+// Use React.createContext to guarantee it is defined
+const UserContext = React.createContext();
 
-// 2. Create the Provider Component
 export const UserProvider = ({ children }) => {
-  const [user, setUser] = useState(null); 
-  const [role, setRole] = useState(null); 
-  const [restaurantId, setRestaurantId] = useState(null); 
-  const [loading, setLoading] = useState(true);
+  // Using React. prefix for all hooks
+  const [user, setUser] = React.useState(null); 
+  const [role, setRole] = React.useState(null); 
+  const [restaurantId, setRestaurantId] = React.useState(null); 
+  const [loading, setLoading] = React.useState(true);
+  const logoutTimer = React.useRef(null);
 
-  // --- AUTO-LOGOUT LOGIC ---
-  const logoutTimer = useRef(null);
-  const ACTIVITY_TIMEOUT = 5 * 60 * 1000; // 5 Minutes
+  const ACTIVITY_TIMEOUT = 5 * 60 * 1000; 
 
   const logout = async () => {
-      console.log("Session timed out due to inactivity.");
       try {
           if (localStorage.getItem('staff_user')) {
               localStorage.removeItem('staff_user');
           } else {
               await signOut(auth);
           }
-      } catch (err) {
-          console.error("Logout error:", err);
-      }
+      } catch (err) { console.error(err); }
       
       setUser(null);
       setRole(null);
@@ -55,11 +48,11 @@ export const UserProvider = ({ children }) => {
 
   const resetTimer = () => {
     if (!user) return;
-    if (logoutTimer.current) clearTimeout(logoutTimer.current);
+    if (logoutTimer.current) React.clearTimeout(logoutTimer.current);
     logoutTimer.current = setTimeout(logout, ACTIVITY_TIMEOUT);
   };
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (!user) return;
     window.addEventListener('mousemove', resetTimer);
     window.addEventListener('keydown', resetTimer);
@@ -76,10 +69,8 @@ export const UserProvider = ({ children }) => {
     };
   }, [user]);
 
-  // --- AUTH STATE LISTENERS ---
-  useEffect(() => {
+  React.useEffect(() => {
     const storedStaff = localStorage.getItem('staff_user');
-    
     if (storedStaff) {
         const staffData = JSON.parse(storedStaff);
         setUser(staffData);
@@ -120,11 +111,8 @@ export const UserProvider = ({ children }) => {
   );
 };
 
-// 3. Export the hook
 export const useUser = () => {
-    const context = useContext(UserContext);
-    if (!context) {
-        throw new Error("useUser must be used within a UserProvider");
-    }
+    const context = React.useContext(UserContext);
+    if (!context) throw new Error("useUser must be used within UserProvider");
     return context;
 };
