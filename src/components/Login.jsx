@@ -100,8 +100,11 @@ const Login = () => {
   };
 
   // --- HANDLER: STAFF LOGIN ---
-  const handleStaffLogin = async (e) => {
+ const handleStaffLogin = async (e) => {
     e.preventDefault();
+    alert("Button Clicked! PIN is: " + staffPin); // <-- ADD THIS
+    console.log("Button Clicked! PIN is:", staffPin); 
+    
     setLoading(true);
     setError('');
 
