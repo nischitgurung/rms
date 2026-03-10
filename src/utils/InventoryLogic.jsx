@@ -8,7 +8,7 @@ import {
   serverTimestamp,
   doc,
   getDoc
-} from 'firebase/firestore';
+} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
 import emailjs from '@emailjs/browser';
 
