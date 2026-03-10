@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "rms-portal",
     "public": "dist",
     "ignore": [
       "firebase.json",

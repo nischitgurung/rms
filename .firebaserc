@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "rms-mvp-2"
-  }
+  },
+  "targets": {
+    "rms-mvp-2": {
+      "hosting": {
+        "app": [
+          "rms-portal"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
