@@ -7,11 +7,8 @@ import {
   getDocs, 
   serverTimestamp,
   doc,
-  getDoc
+  getDoc 
 } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-// FIX: Using CDN import for EmailJS to match Firebase and avoid deployment path issues
-import emailjs from 'https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/index.esm.js';
 
 // 🔑 EMAIL JS CONFIG
 const SERVICE_ID = 'service_lt5byrp';
@@ -20,55 +17,50 @@ const PUBLIC_KEY = 'q6gnSNf0gppPaEkI3';
 
 export const checkAndGenerateLowStockPO = async (item, newQuantity, restaurantId) => {
     try {
-        // 1. Strict Check: Is stock actually low?
         const minStock = parseFloat(item.minStock || 0);
-        if (newQuantity > minStock) return; // Stock is healthy
+        if (newQuantity > minStock) return; 
 
         console.log(`📉 Low Stock Detected: ${item.itemName}`);
 
-        // 2. Supplier check
         const supplierId = item.supplierId;
-        if (!supplierId) {
-            console.warn('No supplier linked. Skipping email + PO.');
-            return;
-        }
+        if (!supplierId) return;
 
-        // 3. Fetch supplier details
         const supplierRef = doc(db, "suppliers", supplierId);
         const supplierSnap = await getDoc(supplierRef);
-
-        if (!supplierSnap.exists()) {
-            console.warn('Supplier not found.');
-            return;
-        }
+        if (!supplierSnap.exists()) return;
 
         const supplier = supplierSnap.data();
 
-        // 4. Send LOW STOCK EMAIL
+        // 4. Send LOW STOCK EMAIL using direct REST API (No library needed)
         if (supplier.email) {
             try {
-                await emailjs.send(
-                    SERVICE_ID,
-                    TEMPLATE_ID,
-                    {
-                        // FIX: Added to_email so EmailJS knows where to send it
-                        to_email: supplier.email, 
+                const emailData = {
+                    service_id: SERVICE_ID,
+                    template_id: TEMPLATE_ID,
+                    user_id: PUBLIC_KEY,
+                    template_params: {
+                        to_email: supplier.email,
                         supplier_name: supplier.name,
                         item_name: item.itemName,
-                        current_qty: newQuantity,
-                        min_stock: minStock,
-                        unit: item.unit
-                    },
-                    PUBLIC_KEY
-                );
-                console.log('📧 Low stock email sent to:', supplier.email);
+                        current_qty: newQuantity.toString(),
+                        min_stock: minStock.toString(),
+                        unit: item.unit || "units"
+                    }
+                };
+
+                await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(emailData)
+                });
+                
+                console.log('📧 Low stock email request sent');
             } catch (emailErr) {
-                // We log this but DON'T stop the function, so the PO still gets created
-                console.error("EmailJS Error (Check your dashboard template):", emailErr);
+                console.error("Email API Error:", emailErr);
             }
         }
 
-        // 5. Prevent Duplicate Draft PO
+        // 5. Purchase Order Logic
         const poRef = collection(db, "purchase_orders");
         const q = query(
             poRef,
@@ -79,7 +71,6 @@ export const checkAndGenerateLowStockPO = async (item, newQuantity, restaurantId
 
         const snapshot = await getDocs(q);
 
-        // 6. Create Draft PO if none exists
         if (snapshot.empty) {
             await addDoc(poRef, {
                 userId: restaurantId,
@@ -93,16 +84,9 @@ export const checkAndGenerateLowStockPO = async (item, newQuantity, restaurantId
                     unit: item.unit
                 }]
             });
-
-            console.log(`⚡ AUTOMATION: Draft PO created for ${item.itemName}`);
-            // Use alert only if you want a popup during the sale
-            // alert(`Automation: Draft PO created for ${item.itemName}`);
-        } else {
-            console.log("Draft PO already exists.");
+            console.log(`⚡ PO Created`);
         }
-
     } catch (error) {
-        // This catch handles any Firestore errors
-        console.error("Low stock automation failed:", error);
+        console.error("Critical Logic Error:", error);
     }
 };
