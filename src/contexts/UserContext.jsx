@@ -97,5 +97,6 @@ export const UserProvider = ({ children }) => {
     </UserContext.Provider>
   );
 };
-
+const app = initializeApp(firebaseConfig);
+export const auth = getAuth(app); //
 export const useUser = () => useContext(UserContext);
