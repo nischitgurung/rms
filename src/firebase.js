@@ -11,9 +11,9 @@ const firebaseConfig = {
   appId: "1:931221656364:web:8c5756184852e008453472"
 };
 
-// 1. Initialize the App
+// Initialize App
 const app = initializeApp(firebaseConfig);
 
-// 2. Export services (Storage removed to prevent the "Service not available" crash)
+// Initialize Services (Storage REMOVED to stop the crash)
 export const db = getFirestore(app);
 export const auth = getAuth(app);
