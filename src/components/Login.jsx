@@ -9,7 +9,7 @@ import {
   PhoneMultiFactorGenerator,
   RecaptchaVerifier 
 } from 'firebase/auth';
-import { collection, query, where, getDocs } from 'firebase/firestore'; 
+import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 import { Link, useNavigate } from 'react-router-dom';
 import { useUser } from '../contexts/UserContext'; 
 
