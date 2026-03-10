@@ -1,7 +1,6 @@
-import { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { auth } from '../firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 const UserContext = createContext();
 
 export const UserProvider = ({ children }) => {
